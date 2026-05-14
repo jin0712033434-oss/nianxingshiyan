@@ -434,7 +434,8 @@ body {
 /* 内容区 */
 .content-area {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;
   background: var(--background);
   display: flex;
@@ -448,24 +449,45 @@ body {
 
 .sub-page.active {
   display: flex;
+  flex-direction: column;
   flex: 1;
   height: 100%;
-  overflow: hidden;
   min-height: 0;
+  overflow: hidden;  /* 禁止滚动 */
+  padding: 0;
+  box-sizing: border-box;
 }
 
 /* ========================================
    原理页面样式
    ======================================== */
 
+#principlePage {
+  overflow-y: auto !important;  /* 原理页面允许滚动 */
+  overflow-x: hidden !important;
+  padding: 20px !important;
+}
+
 .principle-content {
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   background: var(--surface);
   padding: 40px;
   border-radius: 12px;
   box-shadow: 0 2px 8px var(--shadow);
   line-height: 1.8;
+  box-sizing: border-box;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.principle-section {
+  margin-bottom: 20px;
+  padding: 20px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .principle-content h2 {
@@ -750,6 +772,44 @@ input[type="range"]::-moz-range-thumb {
   border-bottom: 2px solid var(--border);
 }
 
+/* 雷诺数警告样式 */
+.warning-message {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: pulseWarning 2s ease-in-out infinite;
+}
+
+@keyframes pulseWarning {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 193, 7, 0); }
+}
+
+.warning-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.warning-text {
+  color: #856404;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+body.dark-theme .warning-message {
+  background: linear-gradient(135deg, #3d3520 0%, #2d2815 100%);
+  border-color: #ffc107;
+}
+
+body.dark-theme .warning-text {
+  color: #ffd54f;
+}
+
 .data-card {
   background: var(--data-output-bg);
   border: 1px solid var(--data-output-border);
@@ -812,11 +872,13 @@ input[type="range"]::-moz-range-thumb {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
+  z-index: 1;
+  cursor: grab;
+}
+
+.canvas-area canvas:active {
+  cursor: grabbing;
 }
 
 /* 响应式设计 */

@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="/main.css">
   <!-- 引入 Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- 引入 OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <!-- 引入 Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -63,7 +65,6 @@
         <div class="menu-container" id="menuContainer">
           <button class="menu-item active" data-page="principle">📖 原理</button>
           <button class="menu-item" data-page="lineSim">📈 线图模拟</button>
-          <button class="menu-item" data-page="realSim">🎮 真实模拟</button>
         </div>
       </aside>
 
@@ -82,9 +83,6 @@
           
           <!-- 线图模拟页面 -->
           <div id="lineSimPage" class="sub-page"></div>
-          
-          <!-- 真实3D模拟页面 -->
-          <div id="realSimPage" class="sub-page"></div>
         </div>
       </main>
     </div>

@@ -3,6 +3,25 @@
 // 功能完全对应Python桌面版本
 // ========================================
 
+// Three.js 3D场景变量（泊肃叶实验）
+// 注意：THREE 对象已从 index.html 中的 CDN 加载
+let poiseuille3DScene = null;
+let poiseuille3DCamera = null;
+let poiseuille3DRenderer = null;
+let poiseuille3DPipe = null;
+let poiseuille3DParticles = [];
+let poiseuille3DGrid = null;
+let poiseuille3DControls = null;  // 轨道控制器，用于自由调整视角
+
+// WASD 键盘控制
+let keysPressed = {
+  w: false,
+  a: false,
+  s: false,
+  d: false
+};
+const cameraMoveSpeed = 0.05;  // 相机移动速度
+
 // 全局状态管理
 const AppState = {
   currentPage: 'home',
@@ -18,7 +37,12 @@ const AppState = {
   chartInstance: null,
   animFrameId: null,
   dataHistory: [],  // 历史数据
-  timeHistory: []   // 时间轴数据
+  timeHistory: [],   // 时间轴数据
+  // 事件监听器引用，用于清理
+  eventListeners: {
+    experimentCards: [],
+    presetGrid: null
+  }
 };
 
 // ========================================
@@ -78,9 +102,9 @@ const EXPERIMENTS = {
       'v_avg': '平均速度 (m/s)'
     },
     params: [
-      { id: 'radius', name: '管道半径 R', symbol: 'R', unit: 'm', min: 0.0005, max: 0.005, step: 0.0001, value: 0.001 },
+      { id: 'radius', name: '管道半径 R', symbol: 'R', unit: 'm', min: 0.0005, max: 0.005, step: 0.0001, value: 0.002 },
       { id: 'length', name: '管道长度 L', symbol: 'L', unit: 'm', min: 0.1, max: 2.0, step: 0.05, value: 1.0 },
-      { id: 'pressure', name: '压强差 ΔP', symbol: 'ΔP', unit: 'Pa', min: 102, max: 105, step: 1, value: 103 },
+      { id: 'pressure', name: '压强差 ΔP', symbol: 'ΔP', unit: 'Pa', min: 100, max: 100000, step: 100, value: 1000 },
       { id: 'viscosity', name: '动力黏度 μ', symbol: 'μ', unit: 'Pa·s', min: 0.00005, max: 2.0, step: 0.00005, value: 0.001, useFluidPreset: true },
       { id: 'density', name: '流体密度 ρ', symbol: 'ρ', unit: 'kg/m³', min: 0.05, max: 1500, step: 0.5, value: 1000, useFluidPreset: true }
     ]
@@ -112,28 +136,37 @@ const EXPERIMENTS = {
 const PhysicsEngine = {
   // 牛顿粘性定律
   newtonViscosity(v, mu, y) {
-    if (!y || y === 0) y = 0.001; // 防止除以零
-    if (!mu || mu === 0) mu = 0.00001;
+    // 参数验证和默认值
+    if (!y || y === 0 || isNaN(y) || !isFinite(y)) y = 0.001; // 防止除以零
+    if (!mu || mu === 0 || isNaN(mu) || !isFinite(mu)) mu = 0.00001;
+    if (!v || isNaN(v) || !isFinite(v)) v = 0;
+    
     const grad = v / y;
     const tau = mu * grad;
+    
     // 防止NaN和Infinity
-    if (!isFinite(grad)) grad = 0;
-    if (!isFinite(tau)) tau = 0;
-    return { grad, tau };
+    return { 
+      grad: isFinite(grad) ? grad : 0, 
+      tau: isFinite(tau) ? tau : 0 
+    };
   },
 
   // 泊肃叶定律
   poiseuille(R, L, dP, mu, rho) {
-    if (!mu || mu === 0) mu = 0.00001; // 防止除以零
-    if (!L || L === 0) L = 0.1;
-    if (!R || R === 0) R = 0.001;
-    if (!rho || rho === 0) rho = 1000;
-    if (!dP || dP < 0) dP = 100;
-    const Q = (Math.PI * Math.pow(R, 4) * dP) / (8 * mu * L);
-    const vmax = (dP * Math.pow(R, 2)) / (4 * mu * L);
-    const Rf = (8 * mu * L) / (Math.PI * Math.pow(R, 4));
+    // 参数验证和默认值
+    if (!mu || mu === 0 || isNaN(mu) || !isFinite(mu)) mu = 0.00001; // 防止除以零
+    if (!L || L === 0 || isNaN(L) || !isFinite(L)) L = 0.1;
+    if (!R || R === 0 || isNaN(R) || !isFinite(R)) R = 0.001;
+    if (!rho || rho === 0 || isNaN(rho) || !isFinite(rho)) rho = 1000;
+    if (!dP || dP < 0 || isNaN(dP) || !isFinite(dP)) dP = 100;
+    
+    const R4 = Math.pow(R, 4);
+    const Q = (Math.PI * R4 * dP) / (8 * mu * L);
+    const vmax = (dP * R * R) / (4 * mu * L);
+    const Rf = (8 * mu * L) / (Math.PI * R4);
     const v_avg = Q / (Math.PI * R * R);
     const Re = (rho * v_avg * 2 * R) / mu;
+    
     // 防止NaN和Infinity
     return {
       Q: isFinite(Q) ? Q : 0,
@@ -146,10 +179,13 @@ const PhysicsEngine = {
 
   // 斯托克斯定律
   stokes(r, rhos, rhof, mu, g = 9.8) {
-    if (!mu || mu === 0) mu = 0.00001; // 防止除以零
-    if (!r || r === 0) r = 0.0001;
-    if (!rhos || rhos === 0) rhos = 1000;
-    if (!rhof || rhof === 0) rhof = 1000;
+    // 参数验证和默认值
+    if (!mu || mu === 0 || isNaN(mu) || !isFinite(mu)) mu = 0.00001; // 防止除以零
+    if (!r || r === 0 || isNaN(r) || !isFinite(r)) r = 0.0001;
+    if (!rhos || rhos === 0 || isNaN(rhos) || !isFinite(rhos)) rhos = 1000;
+    if (!rhof || rhof === 0 || isNaN(rhof) || !isFinite(rhof)) rhof = 1000;
+    if (!g || g === 0 || isNaN(g) || !isFinite(g)) g = 9.8;
+    
     const volume = (4 / 3) * Math.PI * Math.pow(r, 3);
     const mass = rhos * volume;
     const Fg = mass * g;
@@ -157,6 +193,7 @@ const PhysicsEngine = {
     const vt = (2 * Math.pow(r, 2) * (rhos - rhof) * g) / (9 * mu);
     const s = vt / g;
     const Re = (rhof * Math.abs(vt) * 2 * r) / mu;
+    
     // 防止NaN和Infinity
     return {
       Fg: isFinite(Fg) ? Fg : 0,
@@ -176,14 +213,51 @@ const PhysicsEngine = {
 };
 
 // ========================================
+// 工具函数
+// ========================================
+
+// 安全获取元素
+function safeGetElement(id) {
+  const element = document.getElementById(id);
+  if (!element) {
+    console.warn(`Element with id '${id}' not found`);
+  }
+  return element;
+}
+
+// 安全设置元素样式
+function safeSetStyle(element, styles) {
+  if (element && styles) {
+    Object.assign(element.style, styles);
+  }
+}
+
+// 主题颜色工具函数
+const ThemeColors = {
+  getColors() {
+    const isDark = AppState.isDarkTheme;
+    return {
+      titleColor: isDark ? '#00D4FF' : '#1a3c7c',
+      textColor: isDark ? '#ffffff' : '#495057',
+      bgColor: isDark ? '#1a1a25' : '#f8fbff',
+      borderColor: isDark ? '#2a2a3a' : '#e1e8f0'
+    };
+  }
+};
+
+// ========================================
 // 主题管理
 // ========================================
 const ThemeManager = {
   init() {
-    const toggle = document.getElementById('themeToggle');
+    const toggle = safeGetElement('themeToggle');
+    if (!toggle) return;
+    
     toggle.addEventListener('change', (e) => {
       AppState.isDarkTheme = e.target.checked;
       this.applyTheme();
+      // 主题切换后重新渲染当前页面
+      this.onThemeChanged();
     });
   },
 
@@ -193,6 +267,42 @@ const ThemeManager = {
     } else {
       document.body.classList.remove('dark-theme');
     }
+  },
+  
+  // 主题切换后的处理
+  onThemeChanged() {
+    // 如果当前在实验页面，重新渲染原理页面
+    if (AppState.currentPage === 'experiment' && AppState.currentSubPage === 'principle') {
+      renderPrinciplePage();
+    }
+    
+    // 重新初始化图表（如果存在）
+    if (AppState.chartInstance) {
+      this.updateChartTheme();
+    }
+  },
+  
+  // 更新图表主题
+  updateChartTheme() {
+    if (!AppState.chartInstance) return;
+    
+    const isDark = AppState.isDarkTheme;
+    const chart = AppState.chartInstance;
+    
+    // 更新坐标轴颜色
+    if (chart.options.scales.x) {
+      chart.options.scales.x.title.color = isDark ? '#606070' : '#666666';
+      chart.options.scales.x.ticks.color = isDark ? '#606070' : '#666666';
+      chart.options.scales.x.grid.color = isDark ? '#2a2a3a' : '#e0e5ec';
+    }
+    
+    if (chart.options.scales.y) {
+      chart.options.scales.y.title.color = isDark ? '#606070' : '#666666';
+      chart.options.scales.y.ticks.color = isDark ? '#606070' : '#666666';
+      chart.options.scales.y.grid.color = isDark ? '#2a2a3a' : '#e0e5ec';
+    }
+    
+    chart.update('none');
   }
 };
 
@@ -205,6 +315,10 @@ const Navigation = {
     document.getElementById('homePage').style.display = 'flex';
     document.getElementById('experimentPage').style.display = 'none';
     this.stopSimulation();
+    
+    // 注意：不清理实验卡片的事件监听器，它们需要保持可点击状态
+    // 只清理实验内部的事件监听器（如流体预设按钮）
+    cleanupExperimentInternalListeners();
   },
 
   goToExperiment(expType) {
@@ -249,11 +363,26 @@ const Navigation = {
     
     const pageMap = {
       'principle': 'principlePage',
-      'lineSim': 'lineSimPage',
-      'realSim': 'realSimPage'
+      'lineSim': 'lineSimPage'
     };
     
     document.getElementById(pageMap[pageName]).classList.add('active');
+    
+    // 如果切换到线图模拟页面，需要确保Canvas已初始化
+    if (pageName === 'lineSim') {
+      setTimeout(() => {
+        const canvas = document.getElementById('simCanvas');
+        if (canvas && !canvasCtx) {
+          // Canvas元素存在但context未初始化，说明是首次切换
+          initSimulationCanvas();
+        } else if (canvas && canvasCtx) {
+          // Canvas已初始化，但可能需要重新调整尺寸
+          resizeCanvas();
+          // 重新绘制
+          drawSimulationCanvas();
+        }
+      }, 100);
+    }
   },
 
   toggleSidebar() {
@@ -276,13 +405,10 @@ const Navigation = {
 // ========================================
 function renderPrinciplePage() {
   const exp = EXPERIMENTS[AppState.currentExperiment];
-  const container = document.getElementById('principlePage');
+  const container = safeGetElement('principlePage');
+  if (!container) return;
   
-  const theme = AppState.isDarkTheme ? 'dark' : 'light';
-  const titleColor = AppState.isDarkTheme ? '#00D4FF' : '#1a3c7c';
-  const textColor = AppState.isDarkTheme ? '#ffffff' : '#495057';
-  const bgColor = AppState.isDarkTheme ? '#1a1a25' : '#f8fbff';
-  const borderColor = AppState.isDarkTheme ? '#2a2a3a' : '#e1e8f0';
+  const colors = ThemeColors.getColors();
   
   // 根据实验类型生成不同的原理内容
   let principleContent = '';
@@ -290,27 +416,27 @@ function renderPrinciplePage() {
   if (AppState.currentExperiment === 'newton') {
     principleContent = `
       <div class="principle-content">
-        <h2 style="color: ${titleColor}">${exp.icon} ${exp.name}</h2>
+        <h2 style="color: ${colors.titleColor}">${exp.icon} ${exp.name}</h2>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验简介</h3>
-          <p style="color: ${textColor}">牛顿粘性定律实验是研究流体黏性的经典实验。通过在流体中移动平板，测量所需的力，可以得出流体的黏性系数，并验证牛顿黏性定律。</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验简介</h3>
+          <p style="color: ${colors.textColor}">牛顿粘性定律实验是研究流体黏性的经典实验。通过在流体中移动平板，测量所需的力，可以得出流体的黏性系数，并验证牛顿黏性定律。</p>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">牛顿黏性定律</h3>
-          <p style="color: ${textColor}">牛顿黏性定律指出：流体中的剪切应力 τ 与速度梯度 du/dy 成正比。</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">牛顿黏性定律</h3>
+          <p style="color: ${colors.textColor}">牛顿黏性定律指出：流体中的剪切应力 τ 与速度梯度 du/dy 成正比。</p>
           <div class="formula-box">${exp.formula}</div>
-          <p style="color: ${textColor}"><strong>其中：</strong></p>
+          <p style="color: ${colors.textColor}"><strong>其中：</strong></p>
           <ul class="variable-list">
             ${Object.entries(exp.variables).map(([symbol, desc]) => `<li><strong>${symbol}</strong>: ${desc}</li>`).join('')}
           </ul>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验装置</h3>
-          <p style="color: ${textColor}">实验装置主要包括：</p>
-          <ol style="color: ${textColor}; padding-left: 20px;">
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验装置</h3>
+          <p style="color: ${colors.textColor}">实验装置主要包括：</p>
+          <ol style="color: ${colors.textColor}; padding-left: 20px;">
             <li>两块平行平板，其间充满待测流体</li>
             <li>上板固定，下板可移动</li>
             <li>力传感器，用于测量移动下板所需的力</li>
@@ -318,38 +444,38 @@ function renderPrinciplePage() {
           </ol>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">关键概念</h3>
-          <p style="color: ${textColor}">• <strong>黏度</strong>：流体抵抗剪切变形的能力</p>
-          <p style="color: ${textColor}">• <strong>剪切应力</strong>：单位面积上的切向力</p>
-          <p style="color: ${textColor}">• <strong>速度梯度</strong>：速度在垂直于流动方向上的变化率</p>
-          <p style="color: ${textColor}">• <strong>牛顿流体</strong>：满足牛顿黏性定律的流体</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">关键概念</h3>
+          <p style="color: ${colors.textColor}">• <strong>黏度</strong>：流体抵抗剪切变形的能力</p>
+          <p style="color: ${colors.textColor}">• <strong>剪切应力</strong>：单位面积上的切向力</p>
+          <p style="color: ${colors.textColor}">• <strong>速度梯度</strong>：速度在垂直于流动方向上的变化率</p>
+          <p style="color: ${colors.textColor}">• <strong>牛顿流体</strong>：满足牛顿黏性定律的流体</p>
         </div>
       </div>
     `;
   } else if (AppState.currentExperiment === 'poiseuille') {
     principleContent = `
       <div class="principle-content">
-        <h2 style="color: ${titleColor}">${exp.icon} ${exp.name}</h2>
+        <h2 style="color: ${colors.titleColor}">${exp.icon} ${exp.name}</h2>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验简介</h3>
-          <p style="color: ${textColor}">泊肃叶定律描述了不可压缩黏性流体在圆管中做层流运动时的流量规律。该定律在医学（血液流动）、工程（管道设计）等领域有重要应用。</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验简介</h3>
+          <p style="color: ${colors.textColor}">泊肃叶定律描述了不可压缩黏性流体在圆管中做层流运动时的流量规律。该定律在医学（血液流动）、工程（管道设计）等领域有重要应用。</p>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">泊肃叶定律</h3>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">泊肃叶定律</h3>
           <div class="formula-box">${exp.formula}</div>
-          <p style="color: ${textColor}"><strong>其中：</strong></p>
+          <p style="color: ${colors.textColor}"><strong>其中：</strong></p>
           <ul class="variable-list">
             ${Object.entries(exp.variables).map(([symbol, desc]) => `<li><strong>${symbol}</strong>: ${desc}</li>`).join('')}
           </ul>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验装置</h3>
-          <p style="color: ${textColor}">实验装置主要包括：</p>
-          <ol style="color: ${textColor}; padding-left: 20px;">
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验装置</h3>
+          <p style="color: ${colors.textColor}">实验装置主要包括：</p>
+          <ol style="color: ${colors.textColor}; padding-left: 20px;">
             <li>水平圆管，透明材质便于观察</li>
             <li>压力源，提供稳定的压差</li>
             <li>流量计，测量流体流量</li>
@@ -357,41 +483,41 @@ function renderPrinciplePage() {
           </ol>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">关键概念</h3>
-          <p style="color: ${textColor}">• <strong>层流</strong>：流体分层流动，各层互不混合</p>
-          <p style="color: ${textColor}">• <strong>雷诺数</strong>：判断流动状态的无量纲数</p>
-          <p style="color: ${textColor}">• <strong>速度分布</strong>：圆管中层流的速度呈抛物线分布</p>
-          <p style="color: ${textColor}">• <strong>压降</strong>：流体流动过程中压力的损失</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">关键概念</h3>
+          <p style="color: ${colors.textColor}">• <strong>层流</strong>：流体分层流动，各层互不混合</p>
+          <p style="color: ${colors.textColor}">• <strong>雷诺数</strong>：判断流动状态的无量纲数</p>
+          <p style="color: ${colors.textColor}">• <strong>速度分布</strong>：圆管中层流的速度呈抛物线分布</p>
+          <p style="color: ${colors.textColor}">• <strong>压降</strong>：流体流动过程中压力的损失</p>
         </div>
       </div>
     `;
   } else if (AppState.currentExperiment === 'stokes') {
     principleContent = `
       <div class="principle-content">
-        <h2 style="color: ${titleColor}">${exp.icon} ${exp.name}</h2>
+        <h2 style="color: ${colors.titleColor}">${exp.icon} ${exp.name}</h2>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验简介</h3>
-          <p style="color: ${textColor}">斯托克斯定律描述了小球在黏性流体中缓慢运动时所受的阻力。通过观察球体的沉降过程，可以测量流体的黏度。</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验简介</h3>
+          <p style="color: ${colors.textColor}">斯托克斯定律描述了小球在黏性流体中缓慢运动时所受的阻力。通过观察球体的沉降过程，可以测量流体的黏度。</p>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">斯托克斯定律</h3>
-          <p style="color: ${textColor}">斯托克斯阻力公式：</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">斯托克斯定律</h3>
+          <p style="color: ${colors.textColor}">斯托克斯阻力公式：</p>
           <div class="formula-box">${exp.formula}</div>
-          <p style="color: ${textColor}">终端速度公式：</p>
+          <p style="color: ${colors.textColor}">终端速度公式：</p>
           <div class="formula-box">v = (2 · r² · g · (ρs - ρf)) / (9 · μ)</div>
-          <p style="color: ${textColor}"><strong>其中：</strong></p>
+          <p style="color: ${colors.textColor}"><strong>其中：</strong></p>
           <ul class="variable-list">
             ${Object.entries(exp.variables).map(([symbol, desc]) => `<li><strong>${symbol}</strong>: ${desc}</li>`).join('')}
           </ul>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">实验装置</h3>
-          <p style="color: ${textColor}">实验装置主要包括：</p>
-          <ol style="color: ${textColor}; padding-left: 20px;">
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">实验装置</h3>
+          <p style="color: ${colors.textColor}">实验装置主要包括：</p>
+          <ol style="color: ${colors.textColor}; padding-left: 20px;">
             <li>透明圆柱形容器，装满待测流体</li>
             <li>不同材质和大小的小球</li>
             <li>计时装置，测量沉降时间</li>
@@ -399,12 +525,12 @@ function renderPrinciplePage() {
           </ol>
         </div>
         
-        <div class="principle-section" style="background: ${bgColor}; border-color: ${borderColor};">
-          <h3 style="color: ${titleColor}">关键概念</h3>
-          <p style="color: ${textColor}">• <strong>终端速度</strong>：球体达到受力平衡时的恒定速度</p>
-          <p style="color: ${textColor}">• <strong>阻力</strong>：流体对运动物体的阻碍力</p>
-          <p style="color: ${textColor}">• <strong>浮力</strong>：流体对浸入其中物体的向上托力</p>
-          <p style="color: ${textColor}">• <strong>雷诺数</strong>：需小于1，确保层流条件</p>
+        <div class="principle-section" style="background: ${colors.bgColor}; border-color: ${colors.borderColor};">
+          <h3 style="color: ${colors.titleColor}">关键概念</h3>
+          <p style="color: ${colors.textColor}">• <strong>终端速度</strong>：球体达到受力平衡时的恒定速度</p>
+          <p style="color: ${colors.textColor}">• <strong>阻力</strong>：流体对运动物体的阻碍力</p>
+          <p style="color: ${colors.textColor}">• <strong>浮力</strong>：流体对浸入其中物体的向上托力</p>
+          <p style="color: ${colors.textColor}">• <strong>雷诺数</strong>：需小于1，确保层流条件</p>
         </div>
       </div>
     `;
@@ -452,6 +578,7 @@ function renderLineSimPage() {
       <!-- 右侧数据面板 -->
       <div class="data-panel">
         <h3>实时数据</h3>
+        <div id="reynoldsWarning" style="display: none; margin-bottom: 10px;"></div>
         <div id="dataContainer"></div>
         
         <!-- 实时图表 -->
@@ -470,7 +597,11 @@ function renderLineSimPage() {
   console.log('HTML inserted, now setting up controls...');
   
   setupLineSimControls();
-  initSimulationCanvas();
+  
+  // 延迟初始化Canvas，确保DOM已完全渲染
+  setTimeout(() => {
+    initSimulationCanvas();
+  }, 50);
 }
 
 // ========================================
@@ -505,12 +636,16 @@ function setupLineSimControls() {
     `).join('');
     
     // 流体预设点击事件
-    presetGrid.addEventListener('click', (e) => {
+    const presetHandler = (e) => {
       if (e.target.classList.contains('preset-btn')) {
         const fluidName = e.target.dataset.fluid;
         applyFluidPreset(fluidName);
       }
-    });
+    };
+    presetGrid.addEventListener('click', presetHandler);
+    
+    // 存储事件监听器引用
+    AppState.eventListeners.presetGrid = { element: presetGrid, handler: presetHandler };
   }
   
   // 参数滑块事件
@@ -593,6 +728,32 @@ function applyFluidPreset(fluidName) {
   updateDataDisplay();
 }
 
+// 清理实验内部的事件监听器（不包括实验卡片）
+function cleanupExperimentInternalListeners() {
+  // 清理流体预设网格事件监听器
+  if (AppState.eventListeners.presetGrid) {
+    const { element, handler } = AppState.eventListeners.presetGrid;
+    if (element && handler) {
+      element.removeEventListener('click', handler);
+    }
+    AppState.eventListeners.presetGrid = null;
+  }
+}
+
+// 清理所有事件监听器，防止内存泄漏（包括实验卡片）
+function cleanupEventListeners() {
+  // 清理实验卡片事件监听器
+  AppState.eventListeners.experimentCards.forEach(({ element, handler }) => {
+    if (element && handler) {
+      element.removeEventListener('click', handler);
+    }
+  });
+  AppState.eventListeners.experimentCards = [];
+  
+  // 清理流体预设网格事件监听器
+  cleanupExperimentInternalListeners();
+}
+
 // ========================================
 // 动画画布实现
 // ========================================
@@ -600,6 +761,417 @@ let canvasCtx = null;
 // animParticles 保留用于未来扩展，当前绘制函数使用内联粒子生成
 let animParticles = [];
 let resizeHandler = null; // 保存resize事件处理器引用
+
+// 清理Canvas资源
+function cleanupCanvas() {
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+    resizeHandler = null;
+  }
+  canvasCtx = null;
+  
+  // 清理泊肃叶3D场景
+  if (poiseuille3DScene) {
+    cleanupPoiseuille3D();
+  }
+  
+  animParticles = [];
+}
+
+// 根据速度因子获取粒子颜色（快=红色，慢=蓝色，中间=紫色）
+function getParticleColor(velocityFactor) {
+  // velocityFactor: 0 (边缘，慢) ~ 1 (中心，快)
+  
+  // 慢速：蓝色 (0x0066ff)
+  // 中速：紫色 (0xaa44cc)
+  // 快速：红色 (0xff0044)
+  
+  const r = Math.floor(velocityFactor * 255); // 0 ~ 255
+  const g = Math.floor(68 - velocityFactor * 68); // 68 ~ 0
+  const b = Math.floor(255 - velocityFactor * 211); // 255 ~ 44
+  
+  return (r << 16) | (g << 8) | b;
+}
+
+// 泊肃叶3D场景初始化
+function initPoiseuille3D(canvas) {
+  const container = canvas.parentElement;
+  const width = container.offsetWidth;
+  const height = container.offsetHeight;
+  
+  // 创建场景
+  poiseuille3DScene = new THREE.Scene();
+  // 设置浅色背景
+  poiseuille3DScene.background = new THREE.Color(0xf0f4f8);
+  
+  // 创建相机（从侧面观察横向管道）
+  poiseuille3DCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+  // 相机位置：从Z轴方向观察，放大视角（拉近）
+  poiseuille3DCamera.position.set(0, 0, 4.0);
+  
+  // 创建渲染器
+  poiseuille3DRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  poiseuille3DRenderer.setSize(width, height);
+  poiseuille3DRenderer.setPixelRatio(window.devicePixelRatio);
+  poiseuille3DRenderer.setClearColor(0xf0f4f8, 1); // 设置清除颜色
+  
+  // 完全禁用控制器（锁定视角）
+  // OrbitControls 在 r128 中是全局 THREE 对象的一部分
+  if (THREE.OrbitControls) {
+    poiseuille3DControls = new THREE.OrbitControls(poiseuille3DCamera, poiseuille3DRenderer.domElement);
+    // 完全禁用所有交互
+    poiseuille3DControls.enableDamping = false;
+    poiseuille3DControls.enableZoom = false;
+    poiseuille3DControls.enablePan = false;
+    poiseuille3DControls.enableRotate = false;
+    // 设置观察点：看向管道中心
+    poiseuille3DControls.target.set(0, 0, 0);
+    poiseuille3DCamera.lookAt(poiseuille3DControls.target);
+    poiseuille3DControls.update();
+    console.log('✅ 视角已完全锁定 - 相机位置:', poiseuille3DCamera.position);
+  } else {
+    console.warn('⚠️ OrbitControls not available');
+  }
+  
+  // 添加光源
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  poiseuille3DScene.add(ambientLight);
+  
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+  directionalLight.position.set(5, 5, 5);
+  poiseuille3DScene.add(directionalLight);
+  
+  const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+  backLight.position.set(-5, -5, -5);
+  poiseuille3DScene.add(backLight);
+  
+  // 添加额外的顶部光源
+  const topLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  topLight.position.set(0, 10, 0);
+  poiseuille3DScene.add(topLight);
+  
+  // 创建玻璃管道
+  createGlassPipe();
+  
+  // 创建流体粒子
+  createFluidParticles();
+  
+  // 创建网格地面
+  createGridFloor();
+  
+  // 添加resize监听器
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+  }
+  resizeHandler = () => {
+    const newWidth = container.offsetWidth;
+    const newHeight = container.offsetHeight;
+    if (newWidth > 0 && newHeight > 0) {
+      poiseuille3DCamera.aspect = newWidth / newHeight;
+      poiseuille3DCamera.updateProjectionMatrix();
+      poiseuille3DRenderer.setSize(newWidth, newHeight);
+    }
+  };
+  window.addEventListener('resize', resizeHandler);
+  
+  // 立即更新并渲染一次，确保初始视角和粒子位置正确显示
+  if (poiseuille3DRenderer && poiseuille3DScene && poiseuille3DCamera) {
+    // 调用 updatePoiseuille3D 确保粒子位置和相机设置一致
+    updatePoiseuille3D();
+    console.log('Poiseuille 3D initial render complete with camera at:', poiseuille3DCamera.position);
+  }
+  
+  console.log('Poiseuille 3D scene initialized');
+}
+
+// 创建玻璃管道（水平横向，沿X轴方向）
+function createGlassPipe() {
+  const pipeLength = 4;  // 管道长度（横向，沿X轴）
+  const pipeRadius = 0.5;
+  const wallThickness = 0.08;  // 增加管壁厚度（原0.03）
+  
+  // 创建管道几何体（横向圆柱，沿X轴）
+  const pipeGeometry = new THREE.CylinderGeometry(pipeRadius, pipeRadius, pipeLength, 64, 1, true);
+  // 旋转90度，让管道沿X轴方向（横向）
+  pipeGeometry.rotateZ(Math.PI / 2);
+  
+  // 高质量玻璃材质（几乎无反光）
+  const pipeMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x88ccff,
+    transparent: true,
+    opacity: 0.7,  // 增加不透明度，让管壁更明显（原0.55）
+    roughness: 0.9,  // 非常高粗糙度，几乎无反光（原0.3）
+    metalness: 0.0,  // 无金属度
+    transmission: 0.4,  // 降低透光率，让管壁更明显（原0.55）
+    thickness: 0.8,     // 增加玻璃厚度（原0.5）
+    ior: 1.5,           // 折射率
+    envMapIntensity: 0.0,  // 完全关闭环境光反射（原0.5）
+    clearcoat: 0.0,  // 完全关闭清漆层（原0.3）
+    clearcoatRoughness: 1.0,  // 最大粗糙度（原0.4）
+    side: THREE.DoubleSide
+  });
+  
+  poiseuille3DPipe = new THREE.Mesh(pipeGeometry, pipeMaterial);
+  poiseuille3DScene.add(poiseuille3DPipe);
+}
+
+// 创建流体粒子（符合泊肃叶定律：中间快，边缘慢，横向流动）
+function createFluidParticles() {
+  const particleCount = 350; // 增加粒子数量（原200）
+  const pipeLength = 4;  // 管道长度（横向，沿X轴）
+  const pipeRadius = 0.47; // 略小于管道内径（0.5 - 0.03 = 0.47）
+  
+  poiseuille3DParticles = [];
+  
+  for (let i = 0; i < particleCount; i++) {
+    // 随机分布在管道内（使用极坐标确保在圆内）
+    const x = (Math.random() - 0.5) * pipeLength;  // X方向（横向）
+    const angle = Math.random() * Math.PI * 2;
+    const r = Math.random() * pipeRadius * 0.95; // 留出一点边缘空间
+    
+    const y = r * Math.cos(angle);
+    const z = r * Math.sin(angle);
+    
+    // 根据泊肃叶定律计算速度因子：v(r) = v_max * (1 - (r/R)^2)
+    const rRatio = r / pipeRadius;
+    const velocityFactor = 1 - rRatio * rRatio; // 抛物线分布 (0~1)
+    
+    // 根据速度因子计算颜色（快=红色，慢=蓝色）
+    const color = getParticleColor(velocityFactor);
+    
+    const particleGeometry = new THREE.SphereGeometry(0.025, 8, 8);
+    const particleMaterial = new THREE.MeshPhongMaterial({
+      color: color,
+      shininess: 80,
+      emissive: color,
+      emissiveIntensity: 0.15 + velocityFactor * 0.25 // 速度越快自发光越强
+    });
+    
+    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+    particle.position.set(x, y, z);
+    
+    // 存储速度和位置信息
+    particle.userData = {
+      radius: r,
+      angle: angle,
+      velocityFactor: velocityFactor
+    };
+    
+    poiseuille3DScene.add(particle);
+    poiseuille3DParticles.push(particle);
+  }
+}
+
+// 创建网格地面（已禁用）
+function createGridFloor() {
+  // 不创建网格，保持干净背景
+  // const gridSize = 10;
+  // const gridDivisions = 20;
+  // const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x888888, 0xcccccc);
+  // gridHelper.position.y = -1.5;
+  // poiseuille3DGrid = gridHelper;
+  // poiseuille3DScene.add(gridHelper);
+}
+
+// 设置键盘控制（WASD移动相机）
+function setupKeyboardControls() {
+  // 键盘按下事件
+  window.addEventListener('keydown', (event) => {
+    const key = event.key.toLowerCase();
+    if (keysPressed.hasOwnProperty(key)) {
+      keysPressed[key] = true;
+    }
+  });
+  
+  // 键盘释放事件
+  window.addEventListener('keyup', (event) => {
+    const key = event.key.toLowerCase();
+    if (keysPressed.hasOwnProperty(key)) {
+      keysPressed[key] = false;
+    }
+  });
+}
+
+// 更新相机位置（WASD控制）
+function updateCameraMovement() {
+  if (!poiseuille3DCamera || !poiseuille3DControls) return;
+  
+  let moved = false;
+  const speed = cameraMoveSpeed;
+  
+  // 获取相机的前进方向（水平）
+  const forward = new THREE.Vector3();
+  poiseuille3DCamera.getWorldDirection(forward);
+  forward.y = 0;  // 保持水平移动
+  forward.normalize();
+  
+  // 获取右侧方向
+  const right = new THREE.Vector3();
+  right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+  
+  // W: 向前移动
+  if (keysPressed.w) {
+    poiseuille3DCamera.position.x += forward.x * speed;
+    poiseuille3DCamera.position.z += forward.z * speed;
+    moved = true;
+  }
+  
+  // S: 向后移动
+  if (keysPressed.s) {
+    poiseuille3DCamera.position.x -= forward.x * speed;
+    poiseuille3DCamera.position.z -= forward.z * speed;
+    moved = true;
+  }
+  
+  // A: 向左移动
+  if (keysPressed.a) {
+    poiseuille3DCamera.position.x -= right.x * speed;
+    poiseuille3DCamera.position.z -= right.z * speed;
+    moved = true;
+  }
+  
+  // D: 向右移动
+  if (keysPressed.d) {
+    poiseuille3DCamera.position.x += right.x * speed;
+    poiseuille3DCamera.position.z += right.z * speed;
+    moved = true;
+  }
+  
+  // 如果相机移动了，同步更新控制器目标点（保持相同的相对偏移）
+  if (moved) {
+    // 获取当前目标点与相机的偏移
+    const offset = new THREE.Vector3().subVectors(poiseuille3DControls.target, poiseuille3DCamera.position);
+    offset.y = 0;  // 保持水平偏移
+    
+    // 更新目标点
+    poiseuille3DControls.target.copy(poiseuille3DCamera.position).add(offset);
+    poiseuille3DControls.update();
+  }
+}
+
+// 清理泊肃叶3D场景
+function cleanupPoiseuille3D() {
+  // 清理控制器
+  if (poiseuille3DControls) {
+    poiseuille3DControls.dispose();
+    poiseuille3DControls = null;
+  }
+  
+  // 清理粒子
+  poiseuille3DParticles.forEach(particle => {
+    poiseuille3DScene.remove(particle);
+    particle.geometry.dispose();
+    particle.material.dispose();
+  });
+  poiseuille3DParticles = [];
+  
+  // 清理管道
+  if (poiseuille3DPipe) {
+    poiseuille3DScene.remove(poiseuille3DPipe);
+    poiseuille3DPipe.geometry.dispose();
+    poiseuille3DPipe.material.dispose();
+    poiseuille3DPipe = null;
+  }
+  
+  // 清理网格
+  if (poiseuille3DGrid) {
+    poiseuille3DScene.remove(poiseuille3DGrid);
+    poiseuille3DGrid = null;
+  }
+  
+  // 清理渲染器
+  if (poiseuille3DRenderer) {
+    poiseuille3DRenderer.dispose();
+    poiseuille3DRenderer = null;
+  }
+  
+  // 清理场景和相机
+  if (poiseuille3DScene) {
+    // 移除所有光源
+    while(poiseuille3DScene.children.length > 0){ 
+      poiseuille3DScene.remove(poiseuille3DScene.children[0]); 
+    }
+    poiseuille3DScene = null;
+  }
+  poiseuille3DCamera = null;
+  
+  // 清理resize监听器
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+    resizeHandler = null;
+  }
+  
+  console.log('Poiseuille 3D scene cleaned up');
+}
+
+// 更新泊肃叶3D动画（根据参数动态调整）
+function updatePoiseuille3D() {
+  if (!poiseuille3DScene || !poiseuille3DRenderer || !poiseuille3DCamera) return;
+  
+  const pipeLength = 4;  // 3D显示的管道长度（横向，沿X轴）
+  const pipeRadius = 0.47; // 3D管道内径
+  
+  // 更新控制器（阻尼效果需要每帧更新）
+  if (poiseuille3DControls) {
+    poiseuille3DControls.update();
+  }
+  
+  // 完全禁用WASD相机移动（视角已锁定）
+  // updateCameraMovement();  // 已注释，不再允许移动
+  
+  // 只在仿真运行时移动粒子
+  if (AppState.simulationRunning && !AppState.simulationPaused) {
+    // 获取当前参数值
+    const params = getParamValues();
+    
+    // 根据泊肃叶定律计算物理速度
+    const physicsCalc = PhysicsEngine.poiseuille(
+      params.radius,     // 管道半径 (m)
+      params.length,     // 管道长度 (m)
+      params.pressure,   // 压强差 (Pa)
+      params.viscosity,  // 动力黏度 (Pa·s)
+      params.density     // 流体密度 (kg/m³)
+    );
+    
+    // 将物理速度映射到3D动画速度
+    // vmax (m/s) -> 3D速度（像素/帧）
+    // 使用缩放因子让动画速度适中
+    const speedScale = 5; // 降低速度缩放因子（原20）
+    const maxSpeed3D = Math.min(physicsCalc.vmax * speedScale, 0.05); // 降低最大速度限制（原0.1）
+    
+    // 更新每个粒子的速度（根据泊肃叶定律）
+    poiseuille3DParticles.forEach(particle => {
+      // 根据粒子半径计算速度因子：v(r) = vmax * (1 - (r/R)^2)
+      const rRatio = particle.userData.radius / pipeRadius;
+      const velocityFactor = 1 - rRatio * rRatio; // 抛物线分布
+      const speed = maxSpeed3D * velocityFactor;
+      
+      // 粒子沿X轴从左到右流动（横向）
+      particle.position.x += speed;
+      
+      // 当粒子流出管道右端时，重新生成在左端
+      if (particle.position.x > pipeLength / 2) {
+        // 重置到管道左端
+        particle.position.x = -pipeLength / 2;
+        
+        // 保持原有的径向位置（r, angle），只在X轴上循环
+        const r = particle.userData.radius;
+        const angle = particle.userData.angle;
+        particle.position.y = r * Math.cos(angle);
+        particle.position.z = r * Math.sin(angle);
+      }
+      
+      // 添加轻微径向振荡（模拟湍流效应）
+      const time = Date.now() * 0.001;
+      const oscillation = 0.0003 * velocityFactor; // 中心振荡更大
+      particle.position.y += Math.sin(time + particle.userData.angle) * oscillation;
+      particle.position.z += Math.cos(time + particle.userData.angle) * oscillation;
+    });
+  }
+  
+  // 渲染场景
+  poiseuille3DRenderer.render(poiseuille3DScene, poiseuille3DCamera);
+}
 
 function initSimulationCanvas() {
   const canvas = document.getElementById('simCanvas');
@@ -610,6 +1182,13 @@ function initSimulationCanvas() {
   
   console.log('Initializing canvas...', canvas);
   
+  // 如果是泊肃叶实验，初始化3D场景
+  if (AppState.currentExperiment === 'poiseuille') {
+    initPoiseuille3D(canvas);
+    return;
+  }
+  
+  // 其他实验使用2D Canvas
   canvasCtx = canvas.getContext('2d');
   
   // 移除旧的resize监听器（如果存在）
@@ -702,6 +1281,22 @@ function initParticles() {
 // drawCanvasLoop 已移除，统一由 runSimulation 控制绘制循环
 
 function drawSimulationCanvas() {
+  const exp = AppState.currentExperiment;
+  
+  if (!exp) {
+    console.error('No experiment selected');
+    return;
+  }
+  
+  // 泊肃叶实验使用3D渲染
+  if (exp === 'poiseuille') {
+    if (poiseuille3DRenderer && poiseuille3DScene && poiseuille3DCamera) {
+      updatePoiseuille3D();
+    }
+    return;
+  }
+  
+  // 其他实验使用2D Canvas
   if (!canvasCtx) {
     console.error('Canvas context is null');
     return;
@@ -715,12 +1310,6 @@ function drawSimulationCanvas() {
   
   const w = canvas.width;
   const h = canvas.height;
-  const exp = AppState.currentExperiment;
-  
-  if (!exp) {
-    console.error('No experiment selected');
-    return;
-  }
   
   console.log('Drawing simulation:', exp, 'Size:', w, 'x', h);
   
@@ -730,8 +1319,6 @@ function drawSimulationCanvas() {
   
   if (exp === 'newton') {
     drawNewtonSimulation(w, h, isDark);
-  } else if (exp === 'poiseuille') {
-    drawPoiseuilleSimulation(w, h, isDark);
   } else if (exp === 'stokes') {
     drawStokesSimulation(w, h, isDark);
   }
@@ -759,12 +1346,27 @@ function drawNewtonSimulation(w, h, isDark) {
   const viscosity = params.viscosity || 0.001;
   const distance = params.distance || 0.01;
   
-  // 物理计算
-  const grad = velocity / distance;
-  const tau = viscosity * grad;
+  // 物理计算（使用优化后的物理引擎）
+  const calc = PhysicsEngine.newtonViscosity(velocity, viscosity, distance);
+  const grad = calc.grad;
+  const tau = calc.tau;
+  
+  // 预计算颜色值，避免重复计算
+  const gridColor = isDark ? 'rgba(42, 42, 58, 0.3)' : 'rgba(220, 225, 236, 0.7)';
+  const axisColor = isDark ? '#2a2a3a' : '#666666';
+  const tickColor = isDark ? '#606070' : '#999999';
+  const labelColor = isDark ? '#a0a0b0' : '#666666';
+  const curveColor = isDark ? '#00D4FF' : '#1a3c7c';
+  const arrowColor = isDark ? '#00FF88' : '#2ecc71';
+  const tauColor = isDark ? '#FF4D4D' : '#e74c3c';
+  const infoColor = '#00D4FF';
+  
+  // 预计算粘度相关因子
+  const viscosityFactor = 1.0 / (1.0 + Math.log10(Math.max(viscosity / 0.001, 0.01)) * 0.3);
+  const clampedFactor = Math.max(0.1, Math.min(viscosityFactor, 2.0));
+  const vFactor = clampedFactor; // 复用已计算的值
   
   // 1. 绘制网格
-  const gridColor = isDark ? 'rgba(42, 42, 58, 0.3)' : 'rgba(220, 225, 236, 0.7)';
   canvasCtx.strokeStyle = gridColor;
   canvasCtx.lineWidth = 1;
   for (let i = 0; i <= GRID_LINES; i++) {
@@ -782,7 +1384,6 @@ function drawNewtonSimulation(w, h, isDark) {
   }
   
   // 2. 坐标轴
-  const axisColor = isDark ? '#2a2a3a' : '#666666';
   canvasCtx.strokeStyle = axisColor;
   canvasCtx.lineWidth = 2;
   canvasCtx.beginPath();
@@ -792,7 +1393,6 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.stroke();
   
   // 3. 刻度
-  const tickColor = isDark ? '#606070' : '#999999';
   canvasCtx.fillStyle = tickColor;
   canvasCtx.font = '9px Consolas';
   canvasCtx.textAlign = 'center';
@@ -810,7 +1410,6 @@ function drawNewtonSimulation(w, h, isDark) {
   }
   
   // 4. 轴标签
-  const labelColor = isDark ? '#a0a0b0' : '#666666';
   canvasCtx.fillStyle = labelColor;
   canvasCtx.font = '11px Microsoft YaHei';
   canvasCtx.textAlign = 'center';
@@ -823,7 +1422,6 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.restore();
   
   // 5. 速度分布曲线
-  const curveColor = isDark ? '#00D4FF' : '#1a3c7c';
   canvasCtx.strokeStyle = curveColor;
   canvasCtx.lineWidth = 3;
   canvasCtx.beginPath();
@@ -869,7 +1467,6 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.fillRect(sx - 15, sy + ch + 5, cw + 30, 10);
   
   // 7. 上平板箭头
-  const arrowColor = isDark ? '#00FF88' : '#2ecc71';
   canvasCtx.strokeStyle = arrowColor;
   canvasCtx.lineWidth = 2;
   const ax = sx + cw - 50;
@@ -888,39 +1485,42 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.fillText(`v = ${velocity.toFixed(1)} m/s`, ax - 10, ay - 10);
   
   // 8. 切应力标注
-  const tauColor = isDark ? '#FF4D4D' : '#e74c3c';
   canvasCtx.strokeStyle = tauColor;
-  canvasCtx.lineWidth = 2;
+  canvasCtx.lineWidth = 3;
   const tx = sx + cw + 20;
   const ty = sy + ch / 2;
+  
+  // 绘制垂直主线
   canvasCtx.beginPath();
   canvasCtx.moveTo(tx, ty - 40);
   canvasCtx.lineTo(tx, ty + 40);
-  canvasCtx.lineTo(tx - 5, ty - 35);
-  canvasCtx.moveTo(tx, ty - 45);
-  canvasCtx.lineTo(tx + 5, ty - 35);
-  canvasCtx.moveTo(tx, ty + 35);
-  canvasCtx.lineTo(tx - 5, ty + 45);
-  canvasCtx.moveTo(tx, ty + 35);
-  canvasCtx.lineTo(tx + 5, ty + 45);
+  canvasCtx.stroke();
+  
+  // 绘制箭头头部（更大更明显）
+  canvasCtx.lineWidth = 3;
+  canvasCtx.beginPath();
+  // 上箭头
+  canvasCtx.moveTo(tx - 8, ty - 32);
+  canvasCtx.lineTo(tx, ty - 45);
+  canvasCtx.lineTo(tx + 8, ty - 32);
+  // 下箭头
+  canvasCtx.moveTo(tx - 8, ty + 32);
+  canvasCtx.lineTo(tx, ty + 45);
+  canvasCtx.lineTo(tx + 8, ty + 32);
   canvasCtx.stroke();
   
   canvasCtx.fillStyle = tauColor;
-  canvasCtx.font = '11px Microsoft YaHei';
+  canvasCtx.font = 'bold 12px Microsoft YaHei';
   canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`τ = ${tau.toFixed(3)} Pa`, tx + 10, ty + 5);
+  canvasCtx.fillText(`τ = ${tau.toFixed(3)} Pa`, tx + 5, ty + 5);
   
   // 9. 粘度信息
-  const infoColor = '#00D4FF';
   canvasCtx.fillStyle = infoColor;
   canvasCtx.font = '10px Microsoft YaHei';
   canvasCtx.textAlign = 'left';
   canvasCtx.fillText(`μ = ${viscosity.toFixed(4)} Pa·s`, sx + 10, sy + 25);
   
   // 10. 粘度指示
-  const viscosityFactor = 1.0 / (1.0 + Math.log10(Math.max(viscosity / 0.001, 0.01)) * 0.3);
-  const clampedFactor = Math.max(0.1, Math.min(viscosityFactor, 2.0));
-  
   if (clampedFactor < 0.5) {
     canvasCtx.fillStyle = '#e74c3c';
     canvasCtx.fillText('高粘度 - 流动缓慢', sx + 10, sy + 42);
@@ -934,8 +1534,6 @@ function drawNewtonSimulation(w, h, isDark) {
   
   // 11. 动态粒子和流线
   const t = AppState.simTime * 2;
-  const vFactor = 1.0 / (1.0 + Math.log10(Math.max(viscosity / 0.001, 0.01)) * 0.3);
-  const clampedVFactor = Math.max(0.1, Math.min(vFactor, 2.0));
   
   for (let i = 0; i < NUM_LAYERS; i++) {
     const layerYn = i / (NUM_LAYERS - 1);
@@ -955,7 +1553,7 @@ function drawNewtonSimulation(w, h, isDark) {
     canvasCtx.globalAlpha = 0.6;
     canvasCtx.beginPath();
     
-    const animatedV = layerV * clampedVFactor;
+    const animatedV = layerV * vFactor;
     for (let seg = 0; seg < cw; seg += 4) {
       const offset = (seg / 15 + t * animatedV * 5) % (2 * Math.PI);
       const wave = yp + Math.sin(offset) * 3;
@@ -1403,21 +2001,52 @@ function updateDataDisplay() {
     results = PhysicsEngine.stokes(params.ballRadius, params.ballDensity, params.fluidDensity, params.viscosity);
   }
   
+  // 中文标签映射
+  const chineseLabels = {
+    'grad': '速度梯度',
+    'tau': '切应力',
+    'Q': '体积流量',
+    'vmax': '最大速度',
+    'Rf': '流阻',
+    'Re': '雷诺数',
+    'v_avg': '平均速度',
+    'Fg': '重力',
+    'Fb': '浮力',
+    'Fd': '阻力',
+    'vt': '终端速度',
+    't': '时间',
+    'volume': '体积',
+    'mass': '质量'
+  };
+  
   container.innerHTML = Object.entries(results).map(([key, value]) => {
-    const varName = EXPERIMENTS[exp].variables[key] || key;
+    const label = chineseLabels[key] || key;
     let displayValue;
     if (typeof value === 'number') {
       if (isNaN(value) || !isFinite(value)) {
-        displayValue = '0.0000e+0';
+        displayValue = '0';
       } else {
-        displayValue = value.toExponential(4);
+        // 使用科学计数法，转换为 0.000×10ⁿ 格式
+        const expStr = value.toExponential(3);
+        const [mantissa, exponent] = expStr.split('e');
+        
+        // 转换为数字去除末尾零
+        const mantissaNum = parseFloat(mantissa);
+        const mantissaStr = mantissaNum.toString();
+        
+        // 指数转换为上标
+        const expNum = parseInt(exponent);
+        const superscripts = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'};
+        const expSuperscript = expNum.toString().split('').map(c => superscripts[c] || c).join('');
+        
+        displayValue = `${mantissaStr}×10${expSuperscript}`;
       }
     } else {
       displayValue = value;
     }
     return `
       <div class="data-card">
-        <div class="data-label">${key}</div>
+        <div class="data-label">${label}</div>
         <div class="data-value">
           ${displayValue}
           <span class="data-unit">${getUnit(key)}</span>
@@ -1425,6 +2054,24 @@ function updateDataDisplay() {
       </div>
     `;
   }).join('');
+  
+  // 泊肃叶实验：检查雷诺数并显示警告
+  if (exp === 'poiseuille' && results.Re !== undefined) {
+    const warningContainer = document.getElementById('reynoldsWarning');
+    if (warningContainer) {
+      if (results.Re > 2000) {
+        warningContainer.innerHTML = `
+          <div class="warning-message">
+            <span class="warning-icon">⚠️</span>
+            <span class="warning-text">雷诺数 Re = ${results.Re.toFixed(0)} > 2000，不满足层流条件，泊肃叶定律不适用！</span>
+          </div>
+        `;
+        warningContainer.style.display = 'block';
+      } else {
+        warningContainer.style.display = 'none';
+      }
+    }
+  }
 }
 
 function getUnit(key) {
@@ -1650,8 +2297,13 @@ function runSimulation() {
   // 更新实时图表
   updateRealtimeChart();
   
-  // 绘制Canvas动画
-  if (canvasCtx) {
+  // 绘制动画
+  const exp = AppState.currentExperiment;
+  if (exp === 'poiseuille') {
+    // 泊肃叶实验使用3D渲染
+    updatePoiseuille3D();
+  } else if (canvasCtx) {
+    // 其他实验使用2D Canvas
     drawSimulationCanvas();
   }
   
@@ -1706,17 +2358,26 @@ function resetSimulation() {
 // ========================================
 function setupEventListeners() {
   // 实验卡片点击
-  document.querySelectorAll('.experiment-card').forEach(card => {
-    card.addEventListener('click', () => {
+  const cards = document.querySelectorAll('.experiment-card');
+  console.log('Found experiment cards:', cards.length);
+  cards.forEach(card => {
+    const handler = () => {
       const expType = card.dataset.experiment;
+      console.log('Card clicked:', expType);
       Navigation.goToExperiment(expType);
-    });
+    };
+    card.addEventListener('click', handler);
+    // 存储事件监听器引用
+    AppState.eventListeners.experimentCards.push({ element: card, handler });
   });
   
   // 返回首页按钮
-  document.getElementById('backBtn').addEventListener('click', () => {
-    Navigation.goToHome();
-  });
+  const backBtn = document.getElementById('backBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      Navigation.goToHome();
+    });
+  }
   
   // 菜单项点击
   document.querySelectorAll('.menu-item').forEach(item => {
@@ -1727,13 +2388,31 @@ function setupEventListeners() {
   });
   
   // 折叠菜单按钮
-  document.getElementById('toggleSidebar').addEventListener('click', () => {
-    Navigation.toggleSidebar();
-  });
+  const toggleBtn = document.getElementById('toggleSidebar');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      Navigation.toggleSidebar();
+    });
+  }
   
   // 主题切换
   ThemeManager.init();
 }
+
+// ========================================
+// 错误处理
+// ========================================
+
+// 全局错误处理
+window.addEventListener('error', (event) => {
+  console.error('全局错误:', event.error);
+  // 可以在这里添加错误报告逻辑
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('未处理的Promise拒绝:', event.reason);
+  // 可以在这里添加错误报告逻辑
+});
 
 // ========================================
 // 初始化应用
