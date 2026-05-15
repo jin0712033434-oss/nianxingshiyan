@@ -21,6 +21,7 @@ let keysPressed = {
   d: false
 };
 const cameraMoveSpeed = 0.05;  // 相机移动速度
+let keyboardHandlers = null;  // 保存键盘事件处理器引用，用于清理
 
 // 全局状态管理
 const AppState = {
@@ -76,17 +77,18 @@ const EXPERIMENTS = {
   newton: {
     name: '牛顿粘性定律实验',
     icon: '📐',
-    formula: 'τ = μ · (du/dy)',
+    formula: 'F = -η × A × (du/dz)',
     description: '探索牛顿黏性定律，理解剪切应力与速度梯度的关系',
     variables: {
+      'F': '粘性力 (N)',
       'τ': '剪切应力 (Pa)',
-      'μ': '动力黏度 (Pa·s)',
-      'du/dy': '速度梯度 (s⁻¹)'
+      'grad': '速度梯度 (s⁻¹)'
     },
     params: [
-      { id: 'velocity', name: '上平板速度 v', symbol: 'v', unit: 'm/s', min: 0.1, max: 5.0, step: 0.1, value: 1.0 },
-      { id: 'viscosity', name: '动力黏度 μ', symbol: 'μ', unit: 'Pa·s', min: 0.00005, max: 2.0, step: 0.00005, value: 0.001, useFluidPreset: true },
-      { id: 'distance', name: '板间距 y', symbol: 'y', unit: 'm', min: 0.001, max: 0.05, step: 0.001, value: 0.01 }
+      { id: 'distance', name: '板间距 z', symbol: 'z', unit: 'mm', min: 1, max: 50, step: 1, value: 10 },
+      { id: 'velocity', name: '上板速度 u', symbol: 'u', unit: 'm/s', min: 0.01, max: 1.0, step: 0.01, value: 0.1 },
+      { id: 'area', name: '板面积 A', symbol: 'A', unit: 'm²', min: 0.01, max: 1.0, step: 0.01, value: 0.1 },
+      { id: 'viscosity', name: '动力黏度 η', symbol: 'η', unit: 'Pa·s', min: 0.00005, max: 2.0, step: 0.00005, value: 0.001, useFluidPreset: true }
     ]
   },
   poiseuille: {
@@ -135,19 +137,25 @@ const EXPERIMENTS = {
 // ========================================
 const PhysicsEngine = {
   // 牛顿粘性定律
-  newtonViscosity(v, mu, y) {
+  newtonViscosity(v, mu, z, A = 0.1) {
     // 参数验证和默认值
-    if (!y || y === 0 || isNaN(y) || !isFinite(y)) y = 0.001; // 防止除以零
+    if (!z || z === 0 || isNaN(z) || !isFinite(z)) z = 0.01;
     if (!mu || mu === 0 || isNaN(mu) || !isFinite(mu)) mu = 0.00001;
     if (!v || isNaN(v) || !isFinite(v)) v = 0;
+    if (!A || A === 0 || isNaN(A) || !isFinite(A)) A = 0.1;
     
-    const grad = v / y;
-    const tau = mu * grad;
+    // 将板间距从 mm 转换为 m
+    const z_m = z / 1000;
+    
+    const grad = v / z_m;  // 速度梯度 (s⁻¹)
+    const tau = mu * grad;  // 剪切应力 (Pa)
+    const F = tau * A;  // 粘性力 (N)
     
     // 防止NaN和Infinity
     return { 
       grad: isFinite(grad) ? grad : 0, 
-      tau: isFinite(tau) ? tau : 0 
+      tau: isFinite(tau) ? tau : 0,
+      F: isFinite(F) ? F : 0
     };
   },
 
@@ -345,6 +353,14 @@ const Navigation = {
     Navigation.switchSubPage('principle');
     renderPrinciplePage();
     renderLineSimPage();
+    
+    // 泊肃叶实验：默认应用蓖麻油预设
+    if (expType === 'poiseuille') {
+      // 延迟应用预设，确保DOM已渲染
+      setTimeout(() => {
+        applyFluidPreset('蓖麻油 (20°C)');
+      }, 100);
+    }
   },
 
   switchSubPage(pageName) {
@@ -598,10 +614,26 @@ function renderLineSimPage() {
   
   setupLineSimControls();
   
-  // 延迟初始化Canvas，确保DOM已完全渲染
-  setTimeout(() => {
-    initSimulationCanvas();
-  }, 50);
+  // 使用ResizeObserver确保容器有尺寸后再初始化Canvas
+  const canvasArea = document.querySelector('.canvas-area');
+  if (canvasArea) {
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          // 容器有尺寸了，初始化Canvas
+          initSimulationCanvas();
+          observer.disconnect(); // 只触发一次
+        }
+      }
+    });
+    observer.observe(canvasArea);
+  } else {
+    // 降级方案：使用延迟
+    setTimeout(() => {
+      initSimulationCanvas();
+    }, 50);
+  }
 }
 
 // ========================================
@@ -616,7 +648,7 @@ function setupLineSimControls() {
     <div class="param-group">
       <div class="param-label">
         <span class="param-symbol">${param.symbol} - ${param.name}</span>
-        <span class="param-value" id="${param.id}Value">${param.value}</span>
+        <span class="param-value" id="${param.id}Value">${formatScientific(param.value)}</span>
       </div>
       <input type="range" 
              id="${param.id}" 
@@ -655,7 +687,7 @@ function setupLineSimControls() {
     
     slider.addEventListener('input', (e) => {
       const value = parseFloat(e.target.value);
-      valueDisplay.textContent = value.toFixed(param.step < 0.001 ? 5 : param.step < 0.01 ? 3 : 1);
+      valueDisplay.textContent = formatScientific(value);
       updateDataDisplay();
     });
   });
@@ -690,8 +722,26 @@ function setupLineSimControls() {
   // 更新数据
   updateDataDisplay();
   
-  // 初始化实时图表
-  initRealtimeChart();
+  // 使用ResizeObserver确保图表容器有尺寸后再初始化
+  const chartContainer = document.querySelector('.chart-container');
+  if (chartContainer) {
+    const chartObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          // 容器有尺寸了，初始化图表
+          initRealtimeChart();
+          chartObserver.disconnect(); // 只触发一次
+        }
+      }
+    });
+    chartObserver.observe(chartContainer);
+  } else {
+    // 降级方案：使用延迟
+    setTimeout(() => {
+      initRealtimeChart();
+    }, 200);
+  }
 }
 
 // ========================================
@@ -710,7 +760,7 @@ function applyFluidPreset(fluidName) {
         const valueDisplay = document.getElementById('viscosityValue');
         if (slider) {
           slider.value = fluid.mu;
-          valueDisplay.textContent = fluid.mu.toExponential(2);
+          valueDisplay.textContent = formatScientific(fluid.mu);
         }
       }
       if (param.id === 'density' || param.id === 'rho' || param.id === 'fluidDensity') {
@@ -719,7 +769,7 @@ function applyFluidPreset(fluidName) {
         const valueDisplay = document.getElementById(`${sliderId}Value`);
         if (slider) {
           slider.value = fluid.rho;
-          valueDisplay.textContent = fluid.rho.toFixed(2);
+          valueDisplay.textContent = formatScientific(fluid.rho);
         }
       }
     }
@@ -917,48 +967,106 @@ function createGlassPipe() {
 
 // 创建流体粒子（符合泊肃叶定律：中间快，边缘慢，横向流动）
 function createFluidParticles() {
-  const particleCount = 350; // 增加粒子数量（原200）
+  const particleCount = 500; // 增加粒子数量以更好显示层流效果
   const pipeLength = 4;  // 管道长度（横向，沿X轴）
   const pipeRadius = 0.47; // 略小于管道内径（0.5 - 0.03 = 0.47）
   
+  // 层流效果：创建多个同心圆层
+  const layers = 8; // 8个同心圆层
+  const particlesPerLayer = Math.floor(particleCount / layers);
+  
   poiseuille3DParticles = [];
   
-  for (let i = 0; i < particleCount; i++) {
-    // 随机分布在管道内（使用极坐标确保在圆内）
-    const x = (Math.random() - 0.5) * pipeLength;  // X方向（横向）
-    const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * pipeRadius * 0.95; // 留出一点边缘空间
+  for (let layer = 0; layer < layers; layer++) {
+    // 计算当前层的半径（从中心到管壁均匀分布）
+    const layerRadius = (layer / (layers - 1)) * pipeRadius * 0.95;
     
-    const y = r * Math.cos(angle);
-    const z = r * Math.sin(angle);
+    // 根据泊肃叶定律计算该层的速度因子：v(r) = v_max * (1 - (r/R)^2)
+    const rRatio = layerRadius / pipeRadius;
+    const velocityFactor = 1 - rRatio * rRatio; // 抛物线分布
     
-    // 根据泊肃叶定律计算速度因子：v(r) = v_max * (1 - (r/R)^2)
-    const rRatio = r / pipeRadius;
-    const velocityFactor = 1 - rRatio * rRatio; // 抛物线分布 (0~1)
+    // 为该层创建粒子
+    for (let i = 0; i < particlesPerLayer; i++) {
+      // 在层内均匀分布角度
+      const angle = (i / particlesPerLayer) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      
+      // X方向随机分布（横向）
+      const x = (Math.random() - 0.5) * pipeLength;
+      
+      // 计算Y和Z坐标（在圆上）
+      const y = layerRadius * Math.cos(angle);
+      const z = layerRadius * Math.sin(angle);
+      
+      // 根据速度因子计算颜色（快=红色，慢=蓝色）
+      const color = getParticleColor(velocityFactor);
+      
+      // 中心层粒子稍大，边缘层粒子稍小
+      const particleSize = 0.02 + velocityFactor * 0.015;
+      
+      const particleGeometry = new THREE.SphereGeometry(particleSize, 8, 8);
+      const particleMaterial = new THREE.MeshPhongMaterial({
+        color: color,
+        shininess: 80,
+        emissive: color,
+        emissiveIntensity: 0.15 + velocityFactor * 0.25 // 速度越快自发光越强
+      });
+      
+      const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+      particle.position.set(x, y, z);
+      
+      // 存储层信息
+      particle.userData = {
+        layer: layer,
+        radius: layerRadius,
+        angle: angle,
+        velocityFactor: velocityFactor
+      };
+      
+      poiseuille3DScene.add(particle);
+      poiseuille3DParticles.push(particle);
+    }
+  }
+}
+
+// 重置泊肃叶粒子位置（不清理整个场景）
+function resetPoiseuilleParticles() {
+  if (!poiseuille3DScene || poiseuille3DParticles.length === 0) return;
+  
+  const pipeLength = 4;
+  const pipeRadius = 0.47;
+  const layers = 8;
+  const particleCount = 500;
+  const particlesPerLayer = Math.floor(particleCount / layers);
+  
+  // 重置所有粒子到初始位置
+  let particleIndex = 0;
+  for (let layer = 0; layer < layers; layer++) {
+    const layerRadius = (layer / (layers - 1)) * pipeRadius * 0.95;
     
-    // 根据速度因子计算颜色（快=红色，慢=蓝色）
-    const color = getParticleColor(velocityFactor);
-    
-    const particleGeometry = new THREE.SphereGeometry(0.025, 8, 8);
-    const particleMaterial = new THREE.MeshPhongMaterial({
-      color: color,
-      shininess: 80,
-      emissive: color,
-      emissiveIntensity: 0.15 + velocityFactor * 0.25 // 速度越快自发光越强
-    });
-    
-    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-    particle.position.set(x, y, z);
-    
-    // 存储速度和位置信息
-    particle.userData = {
-      radius: r,
-      angle: angle,
-      velocityFactor: velocityFactor
-    };
-    
-    poiseuille3DScene.add(particle);
-    poiseuille3DParticles.push(particle);
+    for (let i = 0; i < particlesPerLayer && particleIndex < poiseuille3DParticles.length; i++) {
+      const particle = poiseuille3DParticles[particleIndex];
+      
+      // 重新分布角度
+      const angle = (i / particlesPerLayer) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      
+      // X方向随机分布
+      const x = (Math.random() - 0.5) * pipeLength;
+      
+      // 更新位置
+      particle.position.x = x;
+      particle.position.y = layerRadius * Math.cos(angle);
+      particle.position.z = layerRadius * Math.sin(angle);
+      
+      // 更新userData
+      particle.userData.angle = angle;
+      
+      particleIndex++;
+    }
+  }
+  
+  // 立即渲染一次
+  if (poiseuille3DRenderer && poiseuille3DScene && poiseuille3DCamera) {
+    poiseuille3DRenderer.render(poiseuille3DScene, poiseuille3DCamera);
   }
 }
 
@@ -975,21 +1083,27 @@ function createGridFloor() {
 
 // 设置键盘控制（WASD移动相机）
 function setupKeyboardControls() {
-  // 键盘按下事件
-  window.addEventListener('keydown', (event) => {
+  // 键盘按下事件处理器
+  const keyDownHandler = (event) => {
     const key = event.key.toLowerCase();
     if (keysPressed.hasOwnProperty(key)) {
       keysPressed[key] = true;
     }
-  });
+  };
   
-  // 键盘释放事件
-  window.addEventListener('keyup', (event) => {
+  // 键盘释放事件处理器
+  const keyUpHandler = (event) => {
     const key = event.key.toLowerCase();
     if (keysPressed.hasOwnProperty(key)) {
       keysPressed[key] = false;
     }
-  });
+  };
+  
+  // 保存处理器引用以便清理
+  keyboardHandlers = { keyDownHandler, keyUpHandler };
+  
+  window.addEventListener('keydown', keyDownHandler);
+  window.addEventListener('keyup', keyUpHandler);
 }
 
 // 更新相机位置（WASD控制）
@@ -1051,6 +1165,13 @@ function updateCameraMovement() {
 
 // 清理泊肃叶3D场景
 function cleanupPoiseuille3D() {
+  // 清理键盘事件监听器
+  if (keyboardHandlers) {
+    window.removeEventListener('keydown', keyboardHandlers.keyDownHandler);
+    window.removeEventListener('keyup', keyboardHandlers.keyUpHandler);
+    keyboardHandlers = null;
+  }
+  
   // 清理控制器
   if (poiseuille3DControls) {
     poiseuille3DControls.dispose();
@@ -1141,7 +1262,7 @@ function updatePoiseuille3D() {
     
     // 更新每个粒子的速度（根据泊肃叶定律）
     poiseuille3DParticles.forEach(particle => {
-      // 根据粒子半径计算速度因子：v(r) = vmax * (1 - (r/R)^2)
+      // 根据粒子所在层的半径计算速度因子：v(r) = vmax * (1 - (r/R)^2)
       const rRatio = particle.userData.radius / pipeRadius;
       const velocityFactor = 1 - rRatio * rRatio; // 抛物线分布
       const speed = maxSpeed3D * velocityFactor;
@@ -1154,18 +1275,19 @@ function updatePoiseuille3D() {
         // 重置到管道左端
         particle.position.x = -pipeLength / 2;
         
-        // 保持原有的径向位置（r, angle），只在X轴上循环
+        // 保持原有的径向位置和角度（层流效果：粒子保持在各自的层内）
         const r = particle.userData.radius;
         const angle = particle.userData.angle;
         particle.position.y = r * Math.cos(angle);
         particle.position.z = r * Math.sin(angle);
       }
       
-      // 添加轻微径向振荡（模拟湍流效应）
+      // 层流效果：禁用径向振荡，保持粒子在各自层内稳定流动
+      // 添加极微小的扰动（模拟分子热运动，但不影响层流效果）
       const time = Date.now() * 0.001;
-      const oscillation = 0.0003 * velocityFactor; // 中心振荡更大
-      particle.position.y += Math.sin(time + particle.userData.angle) * oscillation;
-      particle.position.z += Math.cos(time + particle.userData.angle) * oscillation;
+      const tinyOscillation = 0.00005; // 极小扰动
+      particle.position.y += Math.sin(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
+      particle.position.z += Math.cos(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
     });
   }
   
@@ -1244,8 +1366,7 @@ function resizeCanvas() {
     console.log('Canvas resized to:', canvas.width, 'x', canvas.height);
   } else {
     console.warn('Container has no size:', width, 'x', height);
-    // 如果容器还没有尺寸，稍后重试
-    setTimeout(resizeCanvas, 100);
+    // 不重试，等待ResizeObserver触发
   }
 }
 
@@ -1342,14 +1463,16 @@ function drawNewtonSimulation(w, h, isDark) {
   const sx = MARGIN_LEFT;
   const sy = MARGIN_TOP;
   
-  const velocity = params.velocity || 1;
+  const velocity = params.velocity || 0.1;
   const viscosity = params.viscosity || 0.001;
-  const distance = params.distance || 0.01;
+  const distance = (params.distance || 10) / 1000;  // 将 mm 转换为 m
+  const area = params.area || 0.1;
   
   // 物理计算（使用优化后的物理引擎）
-  const calc = PhysicsEngine.newtonViscosity(velocity, viscosity, distance);
-  const grad = calc.grad;
-  const tau = calc.tau;
+  const calc = PhysicsEngine.newtonViscosity(velocity, viscosity, params.distance || 10, area);
+  const grad = calc.grad || 0;
+  const tau = calc.tau || 0;
+  const F = calc.F || 0;
   
   // 预计算颜色值，避免重复计算
   const gridColor = isDark ? 'rgba(42, 42, 58, 0.3)' : 'rgba(220, 225, 236, 0.7)';
@@ -1361,10 +1484,8 @@ function drawNewtonSimulation(w, h, isDark) {
   const tauColor = isDark ? '#FF4D4D' : '#e74c3c';
   const infoColor = '#00D4FF';
   
-  // 预计算粘度相关因子
-  const viscosityFactor = 1.0 / (1.0 + Math.log10(Math.max(viscosity / 0.001, 0.01)) * 0.3);
-  const clampedFactor = Math.max(0.1, Math.min(viscosityFactor, 2.0));
-  const vFactor = clampedFactor; // 复用已计算的值
+  // 粘度指示器（仅用于显示，不影响动画）
+  const viscosityRatio = viscosity / 0.001;  // 相对于水的粘度比
   
   // 1. 绘制网格
   canvasCtx.strokeStyle = gridColor;
@@ -1482,54 +1603,26 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.fillStyle = arrowColor;
   canvasCtx.font = '10px Microsoft YaHei';
   canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`v = ${velocity.toFixed(1)} m/s`, ax - 10, ay - 10);
-  
-  // 8. 切应力标注
-  canvasCtx.strokeStyle = tauColor;
-  canvasCtx.lineWidth = 3;
-  const tx = sx + cw + 20;
-  const ty = sy + ch / 2;
-  
-  // 绘制垂直主线
-  canvasCtx.beginPath();
-  canvasCtx.moveTo(tx, ty - 40);
-  canvasCtx.lineTo(tx, ty + 40);
-  canvasCtx.stroke();
-  
-  // 绘制箭头头部（更大更明显）
-  canvasCtx.lineWidth = 3;
-  canvasCtx.beginPath();
-  // 上箭头
-  canvasCtx.moveTo(tx - 8, ty - 32);
-  canvasCtx.lineTo(tx, ty - 45);
-  canvasCtx.lineTo(tx + 8, ty - 32);
-  // 下箭头
-  canvasCtx.moveTo(tx - 8, ty + 32);
-  canvasCtx.lineTo(tx, ty + 45);
-  canvasCtx.lineTo(tx + 8, ty + 32);
-  canvasCtx.stroke();
-  
-  canvasCtx.fillStyle = tauColor;
-  canvasCtx.font = 'bold 12px Microsoft YaHei';
-  canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`τ = ${tau.toFixed(3)} Pa`, tx + 5, ty + 5);
+  canvasCtx.fillText(`v = ${(velocity || 0).toFixed(1)} m/s`, ax - 10, ay - 10);
   
   // 9. 粘度信息
   canvasCtx.fillStyle = infoColor;
   canvasCtx.font = '10px Microsoft YaHei';
   canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`μ = ${viscosity.toFixed(4)} Pa·s`, sx + 10, sy + 25);
+  canvasCtx.fillText(`η = ${(viscosity || 0).toFixed(4)} Pa·s`, sx + 10, sy + 25);
+  canvasCtx.fillText(`A = ${(area || 0).toFixed(2)} m²`, sx + 10, sy + 40);
+  canvasCtx.fillText(`F = ${(F || 0).toFixed(4)} N`, sx + 10, sy + 55);
   
-  // 10. 粘度指示
-  if (clampedFactor < 0.5) {
+  // 10. 粘度指示（仅显示，不影响物理动画）
+  if (viscosityRatio > 100) {
     canvasCtx.fillStyle = '#e74c3c';
-    canvasCtx.fillText('高粘度 - 流动缓慢', sx + 10, sy + 42);
-  } else if (clampedFactor > 1.2) {
+    canvasCtx.fillText('高粘度流体（如甘油）', sx + 10, sy + 70);
+  } else if (viscosityRatio < 0.5) {
     canvasCtx.fillStyle = '#2ecc71';
-    canvasCtx.fillText('低粘度 - 流动快速', sx + 10, sy + 42);
+    canvasCtx.fillText('低粘度流体（如空气）', sx + 10, sy + 70);
   } else {
     canvasCtx.fillStyle = '#f39c12';
-    canvasCtx.fillText('中等粘度', sx + 10, sy + 42);
+    canvasCtx.fillText('中等粘度流体（如水）', sx + 10, sy + 70);
   }
   
   // 11. 动态粒子和流线
@@ -1547,15 +1640,16 @@ function drawNewtonSimulation(w, h, isDark) {
     const b = Math.floor(200 * (1 - ratio));
     const color = `rgb(${r}, ${g}, ${b})`;
     
-    // 流线（波浪形虚线）
+    // 流线（波浪形虚线）- 动画速度仅由物理速度决定，不受粘度影响
     canvasCtx.strokeStyle = color;
     canvasCtx.lineWidth = 2;
     canvasCtx.globalAlpha = 0.6;
     canvasCtx.beginPath();
     
-    const animatedV = layerV * vFactor;
+    // 使用真实的层速度进行动画（符合牛顿粘性定律：速度线性分布）
+    const animationSpeed = layerV;  // 直接使用物理速度，不乘以粘度因子
     for (let seg = 0; seg < cw; seg += 4) {
-      const offset = (seg / 15 + t * animatedV * 5) % (2 * Math.PI);
+      const offset = (seg / 15 + t * animationSpeed * 5) % (2 * Math.PI);
       const wave = yp + Math.sin(offset) * 3;
       if (seg === 0) {
         canvasCtx.moveTo(sx + seg, wave);
@@ -1566,10 +1660,10 @@ function drawNewtonSimulation(w, h, isDark) {
     canvasCtx.stroke();
     canvasCtx.globalAlpha = 1.0;
     
-    // 粒子（每层3个）
+    // 粒子（每层3个）- 粒子移动速度仅由物理速度决定
     canvasCtx.fillStyle = color;
     for (let pi = 0; pi < 3; pi++) {
-      const px = sx + ((t * animatedV * 60 + pi * cw / 3) % cw);
+      const px = sx + ((t * animationSpeed * 60 + pi * cw / 3) % cw);
       canvasCtx.beginPath();
       canvasCtx.arc(px, yp, 4, 0, Math.PI * 2);
       canvasCtx.fill();
@@ -1577,183 +1671,7 @@ function drawNewtonSimulation(w, h, isDark) {
   }
 }
 
-function drawPoiseuilleSimulation(w, h, isDark) {
-  const params = getParamValues();
-  
-  // 配置参数
-  const PIPE_RADIUS_RATIO = 0.28;
-  const PIPE_LENGTH_RATIO = 2.2;
-  const PROFILE_WIDTH = 100;
-  const ANIMATION_SPEED = 8.0;
-  
-  const cx = w / 2 - 40;
-  const cy = h / 2;
-  const pipeR = Math.min(w, h) * PIPE_RADIUS_RATIO;
-  const pipeLen = pipeR * PIPE_LENGTH_RATIO;
-  
-  // 物理计算
-  const calc = PhysicsEngine.poiseuille(params.radius, params.length, params.pressure, params.viscosity, params.density);
-  const maxV = Math.max(calc.vmax, 1e-10);
-  
-  // 流体颜色（根据密度）
-  const rhoNormalized = Math.min(Math.max((params.density - 0.5) / (2000 - 0.5), 0), 1);
-  const fluidAlpha = 10 + rhoNormalized * 90;
-  const fluidR = 26 + rhoNormalized * 20;
-  const fluidG = 60 - rhoNormalized * 30;
-  const fluidB = 124 + rhoNormalized * 80;
-  
-  // 1. 管道背景渐变
-  const pipeGrad = canvasCtx.createLinearGradient(cx - pipeR, 0, cx + pipeR, 0);
-  pipeGrad.addColorStop(0, `rgba(${fluidR}, ${fluidG}, ${fluidB}, ${fluidAlpha / 255})`);
-  pipeGrad.addColorStop(0.5, `rgba(${fluidR}, ${fluidG}, ${fluidB}, ${fluidAlpha / 2 / 255})`);
-  pipeGrad.addColorStop(1, `rgba(${fluidR}, ${fluidG}, ${fluidB}, ${fluidAlpha / 255})`);
-  canvasCtx.fillStyle = pipeGrad;
-  canvasCtx.fillRect(cx - pipeR, cy - pipeLen / 2, pipeR * 2, pipeLen);
-  
-  // 2. 管壁
-  const wallColor = isDark ? 'rgba(0, 212, 255, 0.3)' : 'rgba(26, 60, 124, 0.6)';
-  canvasCtx.strokeStyle = wallColor;
-  canvasCtx.lineWidth = 3;
-  canvasCtx.beginPath();
-  canvasCtx.moveTo(cx - pipeR, cy - pipeLen / 2);
-  canvasCtx.lineTo(cx - pipeR, cy + pipeLen / 2);
-  canvasCtx.moveTo(cx + pipeR, cy - pipeLen / 2);
-  canvasCtx.lineTo(cx + pipeR, cy + pipeLen / 2);
-  canvasCtx.stroke();
-  
-  // 3. 端面椭圆（透视效果）
-  const ellipseColor = isDark ? 'rgba(0, 212, 255, 0.4)' : 'rgba(26, 60, 124, 0.7)';
-  canvasCtx.strokeStyle = ellipseColor;
-  canvasCtx.lineWidth = 2;
-  canvasCtx.beginPath();
-  canvasCtx.ellipse(cx, cy - pipeLen / 2, pipeR, pipeR * 0.25, 0, 0, Math.PI * 2);
-  canvasCtx.stroke();
-  canvasCtx.beginPath();
-  canvasCtx.ellipse(cx, cy + pipeLen / 2, pipeR, pipeR * 0.25, 0, 0, Math.PI * 2);
-  canvasCtx.stroke();
-  
-  // 4. 速度剖面（右侧抛物线）
-  const profX = cx + pipeR + 50;
-  const profColor = isDark ? '#00FF88' : '#2ecc71';
-  canvasCtx.strokeStyle = profColor;
-  canvasCtx.lineWidth = 3;
-  canvasCtx.beginPath();
-  
-  for (let i = 0; i <= 60; i++) {
-    const yn = i / 60;
-    const r = (yn - 0.5) * 2;
-    const v = maxV * (1 - r * r);
-    const x = profX + (v / maxV) * PROFILE_WIDTH;
-    const y = cy - pipeLen / 2 + yn * pipeLen;
-    
-    if (i === 0) {
-      canvasCtx.moveTo(x, y);
-    } else {
-      canvasCtx.lineTo(x, y);
-    }
-  }
-  canvasCtx.stroke();
-  
-  // 填充剖面
-  canvasCtx.lineTo(profX, cy + pipeLen / 2);
-  canvasCtx.lineTo(profX, cy - pipeLen / 2);
-  canvasCtx.closePath();
-  canvasCtx.fillStyle = isDark ? 'rgba(0, 255, 136, 0.08)' : 'rgba(46, 204, 113, 0.1)';
-  canvasCtx.fill();
-  
-  // 剖面标签
-  canvasCtx.fillStyle = profColor;
-  canvasCtx.font = '11px Microsoft YaHei';
-  canvasCtx.textAlign = 'left';
-  canvasCtx.fillText('v(r)', profX + PROFILE_WIDTH + 10, cy + pipeLen / 2 + 22);
-  
-  // 5. 压强箭头
-  const arrowColor = isDark ? '#00D4FF' : '#1a3c7c';
-  canvasCtx.strokeStyle = arrowColor;
-  canvasCtx.lineWidth = 2;
-  
-  // 入口箭头
-  canvasCtx.beginPath();
-  canvasCtx.moveTo(cx - pipeR - 70, cy - pipeLen / 2);
-  canvasCtx.lineTo(cx - pipeR - 25, cy - pipeLen / 2);
-  canvasCtx.lineTo(cx - pipeR - 30, cy - pipeLen / 2 - 5);
-  canvasCtx.moveTo(cx - pipeR - 25, cy - pipeLen / 2);
-  canvasCtx.lineTo(cx - pipeR - 30, cy - pipeLen / 2 + 5);
-  canvasCtx.stroke();
-  
-  // 出口箭头
-  canvasCtx.beginPath();
-  canvasCtx.moveTo(cx + pipeR + 70, cy + pipeLen / 2);
-  canvasCtx.lineTo(cx + pipeR + 25, cy + pipeLen / 2);
-  canvasCtx.lineTo(cx + pipeR + 30, cy + pipeLen / 2 - 5);
-  canvasCtx.moveTo(cx + pipeR + 25, cy + pipeLen / 2);
-  canvasCtx.lineTo(cx + pipeR + 30, cy + pipeLen / 2 + 5);
-  canvasCtx.stroke();
-  
-  // 压强标签
-  canvasCtx.fillStyle = arrowColor;
-  canvasCtx.font = '10px Microsoft YaHei';
-  canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`P₁ = ${params.pressure.toFixed(0)} Pa`, cx - pipeR - 80, cy - pipeLen / 2 - 12);
-  canvasCtx.fillText('P₂ = 0 Pa', cx + pipeR + 25, cy + pipeLen / 2 + 22);
-  
-  // 6. 管道参数标签
-  const labelColor = isDark ? '#606070' : '#999999';
-  canvasCtx.fillStyle = labelColor;
-  canvasCtx.font = '10px Microsoft YaHei';
-  canvasCtx.textAlign = 'left';
-  canvasCtx.fillText(`R = ${(params.radius * 1000).toFixed(1)} mm`, cx - 30, cy + pipeLen / 2 + 65);
-  canvasCtx.fillText(`L = ${params.length.toFixed(1)} m`, cx - 30, cy + pipeLen / 2 + 85);
-  
-  // 密度标签
-  const densityColor = isDark ? '#00D4FF' : '#f39c12';
-  canvasCtx.fillStyle = densityColor;
-  canvasCtx.fillText(`ρ = ${params.density.toFixed(1)} kg/m³`, cx - 40, cy + pipeLen / 2 + 105);
-  
-  // 7. 动态粒子（400个，透视效果）
-  const t = AppState.simTime * ANIMATION_SPEED;
-  
-  // 使用固定种子确保可重复性
-  const particles = [];
-  for (let i = 0; i < 400; i++) {
-    // 伪随机数生成（基于索引）
-    const rNorm = ((i * 7919 + 104729) % 100000) / 100000;
-    const angle = ((i * 65537 + 104729) % 100000) / 100000 * Math.PI * 2;
-    const r = rNorm * pipeR * 0.88;
-    
-    // 抛物线速度分布
-    const v = maxV * (1 - rNorm * rNorm);
-    const vAnim = Math.sqrt(v / maxV) * maxV;
-    
-    // 流动偏移
-    const flowOff = (t * vAnim * 50 + i * 7) % pipeLen;
-    const z = cy + pipeLen / 2 - flowOff;
-    
-    // 只绘制在管道范围内的粒子
-    if (z < cy - pipeLen / 2 || z > cy + pipeLen / 2) continue;
-    
-    // 透视缩放
-    const scale = 0.3 + (z - (cy - pipeLen / 2)) / pipeLen * 0.7;
-    const px = cx + Math.cos(angle) * r * 0.25 * scale;
-    
-    // 颜色（根据速度）
-    const ratio = Math.min(v / (maxV * 1.1), 1);
-    const pr = Math.floor(255 * ratio);
-    const pg = Math.floor(100 * (1 - ratio));
-    const pb = Math.floor(200 * (1 - ratio));
-    const alpha = Math.floor(255 * (0.6 + scale * 0.3) * (0.4 + rhoNormalized * 0.5));
-    
-    particles.push({ x: px, y: z, radius: 2.5 * scale, color: `rgba(${pr}, ${pg}, ${pb}, ${alpha / 255})` });
-  }
-  
-  // 批量绘制粒子
-  particles.forEach(p => {
-    canvasCtx.fillStyle = p.color;
-    canvasCtx.beginPath();
-    canvasCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-    canvasCtx.fill();
-  });
-}
+
 
 function drawStokesSimulation(w, h, isDark) {
   const params = getParamValues();
@@ -1962,6 +1880,28 @@ function drawStokesSimulation(w, h, isDark) {
   }
 }
 
+// 格式化数值为科学计数法（带Unicode上标）
+function formatScientific(value, decimals = 3) {
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return '0';
+  }
+  
+  // 使用科学计数法
+  const expStr = value.toExponential(decimals);
+  const [mantissa, exponent] = expStr.split('e');
+  
+  // 转换为数字去除末尾零
+  const mantissaNum = parseFloat(mantissa);
+  const mantissaStr = mantissaNum.toString();
+  
+  // 指数转换为上标
+  const expNum = parseInt(exponent);
+  const superscripts = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'};
+  const expSuperscript = expNum.toString().split('').map(c => superscripts[c] || c).join('');
+  
+  return `${mantissaStr}×10${expSuperscript}`;
+}
+
 function getParamValues() {
   const exp = EXPERIMENTS[AppState.currentExperiment];
   if (!exp) return {};
@@ -1994,7 +1934,7 @@ function updateDataDisplay() {
   let results = {};
   
   if (exp === 'newton') {
-    results = PhysicsEngine.newtonViscosity(params.velocity, params.viscosity, params.distance);
+    results = PhysicsEngine.newtonViscosity(params.velocity, params.viscosity, params.distance, params.area);
   } else if (exp === 'poiseuille') {
     results = PhysicsEngine.poiseuille(params.radius, params.length, params.pressure, params.viscosity, params.density);
   } else if (exp === 'stokes') {
@@ -2005,6 +1945,7 @@ function updateDataDisplay() {
   const chineseLabels = {
     'grad': '速度梯度',
     'tau': '切应力',
+    'F': '粘性力',
     'Q': '体积流量',
     'vmax': '最大速度',
     'Rf': '流阻',
@@ -2021,29 +1962,7 @@ function updateDataDisplay() {
   
   container.innerHTML = Object.entries(results).map(([key, value]) => {
     const label = chineseLabels[key] || key;
-    let displayValue;
-    if (typeof value === 'number') {
-      if (isNaN(value) || !isFinite(value)) {
-        displayValue = '0';
-      } else {
-        // 使用科学计数法，转换为 0.000×10ⁿ 格式
-        const expStr = value.toExponential(3);
-        const [mantissa, exponent] = expStr.split('e');
-        
-        // 转换为数字去除末尾零
-        const mantissaNum = parseFloat(mantissa);
-        const mantissaStr = mantissaNum.toString();
-        
-        // 指数转换为上标
-        const expNum = parseInt(exponent);
-        const superscripts = {'0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'};
-        const expSuperscript = expNum.toString().split('').map(c => superscripts[c] || c).join('');
-        
-        displayValue = `${mantissaStr}×10${expSuperscript}`;
-      }
-    } else {
-      displayValue = value;
-    }
+    const displayValue = typeof value === 'number' ? formatScientific(value) : value;
     return `
       <div class="data-card">
         <div class="data-label">${label}</div>
@@ -2078,6 +1997,7 @@ function getUnit(key) {
   const units = {
     'grad': 's⁻¹',
     'tau': 'Pa',
+    'F': 'N',
     'Q': 'm³/s',
     'vmax': 'm/s',
     'Rf': 'Pa·s/m³',
@@ -2100,6 +2020,20 @@ function initRealtimeChart() {
   const ctx = document.getElementById('realtimeChart');
   if (!ctx) {
     console.error('realtimeChart canvas not found');
+    return;
+  }
+  
+  const parent = ctx.parentElement;
+  const parentWidth = parent.offsetWidth;
+  const parentHeight = parent.offsetHeight;
+  
+  console.log('Initializing chart, canvas element:', ctx);
+  console.log('Canvas parent:', parent);
+  console.log('Parent size:', parentWidth, 'x', parentHeight);
+  
+  // 如果父容器还没有尺寸，不初始化（调用方应确保容器有尺寸）
+  if (parentWidth === 0 || parentHeight === 0) {
+    console.warn('Chart container has no size, skipping initialization');
     return;
   }
   
@@ -2177,11 +2111,13 @@ function initRealtimeChart() {
   };
   
   AppState.chartInstance = new Chart(ctx, chartConfig);
+  console.log('Chart instance created:', AppState.chartInstance);
+  console.log('Chart y-axis label:', getChartYLabel(exp));
 }
 
 function getChartLabel(exp) {
   const labels = {
-    'newton': '切应力 τ',
+    'newton': '粘性力 F',
     'poiseuille': '体积流量 Q',
     'stokes': '速度 v'
   };
@@ -2199,7 +2135,7 @@ function getChartColor(exp) {
 
 function getChartYLabel(exp) {
   const labels = {
-    'newton': 'τ (Pa)',
+    'newton': 'F (N)',
     'poiseuille': 'Q (×10⁻⁶ m³/s)',
     'stokes': 'v (m/s)'
   };
@@ -2207,30 +2143,40 @@ function getChartYLabel(exp) {
 }
 
 function updateRealtimeChart() {
-  if (!AppState.chartInstance) return;
+  if (!AppState.chartInstance) {
+    console.warn('Chart instance not initialized');
+    return;
+  }
   
   const exp = AppState.currentExperiment;
   const params = getParamValues();
+  
+  console.log('[Chart Update] Experiment:', exp, 'Params:', params);
   
   // 计算当前数据点
   let currentValue = 0;
   let refLine = null;
   
   if (exp === 'newton') {
-    const calc = PhysicsEngine.newtonViscosity(params.velocity, params.viscosity, params.distance);
-    currentValue = calc.tau;
+    const calc = PhysicsEngine.newtonViscosity(params.velocity, params.viscosity, params.distance, params.area);
+    currentValue = calc.F;  // 使用粘性力 F 而不是切应力 τ
+    console.log('[Chart Update] Newton - F:', currentValue, 'calc:', calc);
   } else if (exp === 'poiseuille') {
     const calc = PhysicsEngine.poiseuille(params.radius, params.length, params.pressure, params.viscosity, params.density);
     currentValue = calc.Q * 1e6; // 转换为 ×10⁻⁶ m³/s
+    console.log('[Chart Update] Poiseuille - Q:', currentValue);
   } else if (exp === 'stokes') {
     const calc = PhysicsEngine.stokes(params.ballRadius, params.ballDensity, params.fluidDensity, params.viscosity);
     currentValue = AppState.stokesBallV || 0;
     refLine = calc.vt; // 终端速度参考线
+    console.log('[Chart Update] Stokes - v:', currentValue);
   }
   
   // 添加数据到历史
   AppState.dataHistory.push(currentValue);
   AppState.timeHistory.push(AppState.simTime);
+  
+  console.log('[Chart Update] History length:', AppState.dataHistory.length, 'Time:', AppState.simTime.toFixed(1));
   
   // 限制历史数据长度（最多显示20秒）
   const maxTime = 20;
@@ -2244,6 +2190,9 @@ function updateRealtimeChart() {
   const chart = AppState.chartInstance;
   chart.data.labels = AppState.timeHistory.map(t => t.toFixed(1));
   chart.data.datasets[0].data = AppState.dataHistory;
+  
+  console.log('[Chart Update] Chart data - labels:', chart.data.labels.length, 'data points:', chart.data.datasets[0].data.length);
+  console.log('[Chart Update] First 5 data points:', chart.data.datasets[0].data.slice(0, 5));
   
   // 更新参考线（仅斯托克斯实验）
   if (exp === 'stokes' && refLine !== null) {
@@ -2263,6 +2212,7 @@ function updateRealtimeChart() {
   }
   
   chart.update('none'); // 'none' 模式禁用动画，提高性能
+  console.log('[Chart Update] Chart.update() called');
 }
 
 // ========================================
@@ -2316,9 +2266,12 @@ function pauseSimulation() {
 }
 
 function resetSimulation() {
+  const exp = AppState.currentExperiment;
+  
+  // 停止仿真
   Navigation.stopSimulation();
   
-  // 重置状态
+  // 重置仿真状态
   AppState.simTime = 0;
   AppState.stokesBallY = 0.05;
   AppState.stokesBallV = 0;
@@ -2326,14 +2279,41 @@ function resetSimulation() {
   AppState.timeHistory = [];
   
   // 重置粒子
-  initParticles();
+  if (exp === 'poiseuille') {
+    // 泊肃叶实验：只重置粒子位置，不清理整个场景
+    resetPoiseuilleParticles();
+  } else {
+    // 其他实验：重置2D粒子
+    initParticles();
+  }
   
   // 重绘画布
   if (canvasCtx) {
     drawSimulationCanvas();
   }
   
-  updateDataDisplay();
+  // 重置参数为默认值
+  const experiment = EXPERIMENTS[exp];
+  experiment.params.forEach(param => {
+    const slider = document.getElementById(param.id);
+    const valueDisplay = document.getElementById(`${param.id}Value`);
+    if (slider) {
+      slider.value = param.value;
+      valueDisplay.textContent = formatScientific(param.value);
+    }
+  });
+  
+  // 泊肃叶实验：重置为蓖麻油预设
+  if (exp === 'poiseuille') {
+    setTimeout(() => {
+      applyFluidPreset('蓖麻油 (20°C)');
+    }, 100);
+  }
+  
+  // 更新数据
+  setTimeout(() => {
+    updateDataDisplay();
+  }, 150);
   
   // 重置图表
   if (AppState.chartInstance) {
@@ -2345,7 +2325,7 @@ function resetSimulation() {
     AppState.chartInstance.update('none');
   }
   
-  // 更新按钮状态为“开始”
+  // 更新按钮状态为"开始"
   const playPauseBtn = document.getElementById('playPauseBtn');
   if (playPauseBtn) {
     playPauseBtn.innerHTML = '▶ 开始';
