@@ -288,6 +288,16 @@ const ThemeManager = {
     if (AppState.chartInstance) {
       this.updateChartTheme();
     }
+    
+    // 更新泊肃叶3D场景的背景颜色
+    if (poiseuille3DScene) {
+      const isDark = AppState.isDarkTheme;
+      const bgColor = isDark ? 0x1a1a25 : 0xf0f4f8;
+      poiseuille3DScene.background = new THREE.Color(bgColor);
+      if (poiseuille3DRenderer) {
+        poiseuille3DRenderer.setClearColor(bgColor, 1);
+      }
+    }
   },
   
   // 更新图表主题
@@ -689,6 +699,11 @@ function setupLineSimControls() {
       const value = parseFloat(e.target.value);
       valueDisplay.textContent = formatScientific(value);
       updateDataDisplay();
+      
+      // 如果仿真未运行，也要重绘画布以反映参数变化（特别是粘度视觉效果）
+      if (!AppState.simulationRunning || AppState.simulationPaused) {
+        drawSimulationCanvas();
+      }
     });
   });
   
@@ -851,8 +866,10 @@ function initPoiseuille3D(canvas) {
   
   // 创建场景
   poiseuille3DScene = new THREE.Scene();
-  // 设置浅色背景
-  poiseuille3DScene.background = new THREE.Color(0xf0f4f8);
+  // 根据主题设置背景颜色
+  const isDark = document.body.classList.contains('dark-theme');
+  const bgColor = isDark ? 0x1a1a25 : 0xf0f4f8;
+  poiseuille3DScene.background = new THREE.Color(bgColor);
   
   // 创建相机（从侧面观察横向管道）
   poiseuille3DCamera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
@@ -863,7 +880,7 @@ function initPoiseuille3D(canvas) {
   poiseuille3DRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
   poiseuille3DRenderer.setSize(width, height);
   poiseuille3DRenderer.setPixelRatio(window.devicePixelRatio);
-  poiseuille3DRenderer.setClearColor(0xf0f4f8, 1); // 设置清除颜色
+  poiseuille3DRenderer.setClearColor(bgColor, 1); // 设置清除颜色
   
   // 完全禁用控制器（锁定视角）
   // OrbitControls 在 r128 中是全局 THREE 对象的一部分
@@ -994,8 +1011,16 @@ function createFluidParticles() {
       const x = (Math.random() - 0.5) * pipeLength;
       
       // 计算Y和Z坐标（在圆上）
-      const y = layerRadius * Math.cos(angle);
-      const z = layerRadius * Math.sin(angle);
+      let y = layerRadius * Math.cos(angle);
+      let z = layerRadius * Math.sin(angle);
+      
+      // 安全检查：确保粒子在管道内部
+      const checkRadius = Math.sqrt(y * y + z * z);
+      if (checkRadius > pipeRadius - 0.02) {
+        const scale = (pipeRadius - 0.03) / checkRadius;
+        y = y * scale;
+        z = z * scale;
+      }
       
       // 根据速度因子计算颜色（快=红色，慢=蓝色）
       const color = getParticleColor(velocityFactor);
@@ -1283,11 +1308,18 @@ function updatePoiseuille3D() {
       }
       
       // 层流效果：禁用径向振荡，保持粒子在各自层内稳定流动
-      // 添加极微小的扰动（模拟分子热运动，但不影响层流效果）
-      const time = Date.now() * 0.001;
-      const tinyOscillation = 0.00005; // 极小扰动
-      particle.position.y += Math.sin(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
-      particle.position.z += Math.cos(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
+      // 完全移除径向扰动，确保粒子不会穿模
+      // particle.position.y += Math.sin(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
+      // particle.position.z += Math.cos(time * 0.5 + particle.userData.angle * 10) * tinyOscillation;
+      
+      // 安全检查：确保粒子在管道内部
+      const currentRadius = Math.sqrt(particle.position.y ** 2 + particle.position.z ** 2);
+      if (currentRadius > pipeRadius - 0.02) {  // 留出0.02的余量
+        // 将粒子拉回管道内部
+        const scale = (pipeRadius - 0.03) / currentRadius;
+        particle.position.y *= scale;
+        particle.position.z *= scale;
+      }
     });
   }
   
@@ -1542,27 +1574,6 @@ function drawNewtonSimulation(w, h, isDark) {
   canvasCtx.fillText('距离 y (m)', 0, 0);
   canvasCtx.restore();
   
-  // 5. 速度分布曲线
-  canvasCtx.strokeStyle = curveColor;
-  canvasCtx.lineWidth = 3;
-  canvasCtx.beginPath();
-  
-  for (let i = 0; i <= 100; i++) {
-    const yn = i / 100;
-    const yVal = yn * MAX_DISTANCE;
-    const vVal = (yVal / distance) * velocity;
-    const xRatio = vVal / MAX_VELOCITY;
-    const x = sx + xRatio * cw;
-    const y = sy + ch - yn * ch;
-    
-    if (i === 0) {
-      canvasCtx.moveTo(x, y);
-    } else {
-      canvasCtx.lineTo(x, y);
-    }
-  }
-  canvasCtx.stroke();
-  
   // 6. 上下平板（圆角矩形）
   const plateGrad1 = canvasCtx.createLinearGradient(sx, sy - 15, sx, sy - 5);
   if (isDark) {
@@ -1625,8 +1636,34 @@ function drawNewtonSimulation(w, h, isDark) {
     canvasCtx.fillText('中等粘度流体（如水）', sx + 10, sy + 70);
   }
   
-  // 11. 动态粒子和流线
+  // 11. 动态粒子和流线（添加粘度视觉效果）
   const t = AppState.simTime * 2;
+  
+  // 11.5. 上平板移动条纹（显示运动效果）- 需要在 t 定义之后
+  // 条纹间距随板面积变化：板面积越大，间距越大
+  const baseStripeSpacing = 8;  // 基础间距
+  const areaScaleFactor = area / 0.1;  // 相对于默认值0.1m²的缩放因子
+  const stripeSpacing = baseStripeSpacing * Math.sqrt(areaScaleFactor);  // 使用平方根避免变化过大
+  const stripeWidth = stripeSpacing * 0.5;     // 条纹宽度为间距的一半
+  const stripeSpeed = velocity * 30;  // 条纹移动速度与上板速度成正比
+  const stripeOffset = (t * stripeSpeed) % stripeSpacing;  // 条纹偏移量
+  
+  canvasCtx.fillStyle = isDark ? 'rgba(0, 212, 255, 0.3)' : 'rgba(26, 60, 124, 0.3)';
+  for (let stripeX = sx - 15 + stripeOffset; stripeX < sx + cw + 15; stripeX += stripeSpacing) {
+    canvasCtx.fillRect(stripeX, sy - 15, stripeWidth, 10);
+  }
+  
+  // 计算粘度视觉因子（线性均匀分布）
+  // 粘度范围：0.00005 ~ 2.0 Pa·s
+  const minViscosity = 0.00005;
+  const maxViscosity = 2.0;
+  const normalizedViscosity = (viscosity - minViscosity) / (maxViscosity - minViscosity);  // 线性归一化到 0~1
+  
+  // 拖尾长度：线性均匀映射 2~25 像素
+  const trailLength = 2 + normalizedViscosity * 23;
+  
+  // 波浪幅度：线性均匀映射 4~0.5 像素
+  const waveAmplitude = 4 - normalizedViscosity * 3.5;
   
   for (let i = 0; i < NUM_LAYERS; i++) {
     const layerYn = i / (NUM_LAYERS - 1);
@@ -1640,7 +1677,7 @@ function drawNewtonSimulation(w, h, isDark) {
     const b = Math.floor(200 * (1 - ratio));
     const color = `rgb(${r}, ${g}, ${b})`;
     
-    // 流线（波浪形虚线）- 动画速度仅由物理速度决定，不受粘度影响
+    // 流线（波浪形虚线）- 添加粘度影响的波浪幅度
     canvasCtx.strokeStyle = color;
     canvasCtx.lineWidth = 2;
     canvasCtx.globalAlpha = 0.6;
@@ -1649,8 +1686,9 @@ function drawNewtonSimulation(w, h, isDark) {
     // 使用真实的层速度进行动画（符合牛顿粘性定律：速度线性分布）
     const animationSpeed = layerV;  // 直接使用物理速度，不乘以粘度因子
     for (let seg = 0; seg < cw; seg += 4) {
-      const offset = (seg / 15 + t * animationSpeed * 5) % (2 * Math.PI);
-      const wave = yp + Math.sin(offset) * 3;
+      // 波浪相位：减去时间项使波浪向右移动（与粒子方向一致）
+      const offset = (seg / 15 - t * animationSpeed * 5) % (2 * Math.PI);
+      const wave = yp + Math.sin(offset) * waveAmplitude;  // 波浪幅度受粘度影响
       if (seg === 0) {
         canvasCtx.moveTo(sx + seg, wave);
       } else {
@@ -1660,15 +1698,98 @@ function drawNewtonSimulation(w, h, isDark) {
     canvasCtx.stroke();
     canvasCtx.globalAlpha = 1.0;
     
-    // 粒子（每层3个）- 粒子移动速度仅由物理速度决定
+    // 粒子（每层8个）- 添加拖尾效果，均匀分布
     canvasCtx.fillStyle = color;
-    for (let pi = 0; pi < 3; pi++) {
-      const px = sx + ((t * animationSpeed * 60 + pi * cw / 3) % cw);
+    const particlesPerLayer = 8;  // 每层粒子数
+    for (let pi = 0; pi < particlesPerLayer; pi++) {
+      const px = sx + ((t * animationSpeed * 60 + pi * cw / particlesPerLayer) % cw);
+      
+      // 绘制拖尾（高粘度流体拖尾更长）
+      const trailSegments = Math.floor(trailLength);
+      for (let ti = 0; ti < trailSegments; ti++) {
+        const trailOffset = ti * 3;  // 拖尾间隔
+        const trailX = px - trailOffset;
+        const trailAlpha = 1 - (ti / trailSegments);  // 渐隐效果
+        const trailRadius = 4 * trailAlpha;  // 渐小效果
+        
+        canvasCtx.globalAlpha = trailAlpha * 0.6;
+        canvasCtx.beginPath();
+        canvasCtx.arc(trailX, yp, trailRadius, 0, Math.PI * 2);
+        canvasCtx.fill();
+      }
+      
+      // 绘制主粒子
+      canvasCtx.globalAlpha = 1.0;
       canvasCtx.beginPath();
       canvasCtx.arc(px, yp, 4, 0, Math.PI * 2);
       canvasCtx.fill();
     }
+    canvasCtx.globalAlpha = 1.0;
   }
+  
+  // 12. 速度梯度指示线（蓝色虚线，显示速度分布）
+  // 计算最上层（第0层）第1个小球的x坐标
+  const topLayerV = velocity;  // 最上层速度 = velocity
+  const topParticle1X = sx + ((t * topLayerV * 60 + 0 * cw / 8) % cw);  // 第1个小球（pi=0）
+  const topParticleY = sy;  // 最上层y坐标
+  
+  // 计算最下层（第NUM_LAYERS-1层）每个小球的x坐标
+  const bottomLayerV = 0;  // 最下层速度 = 0
+  const bottomParticleY = sy + ch;  // 最下层y坐标
+  
+  // 计算最下层8个小球的x坐标
+  const bottomParticles = [];
+  for (let pi = 0; pi < 8; pi++) {
+    bottomParticles.push(sx + ((t * bottomLayerV * 60 + pi * cw / 8) % cw));
+  }
+  
+  // 找到最下层哪个小球与最上层第1个小球在同一竖直线（x坐标最接近）
+  let bottomParticleIndex = 0;
+  let minDistance = Infinity;
+  
+  for (let pi = 0; pi < 8; pi++) {
+    const distance = Math.abs(bottomParticles[pi] - topParticle1X);
+    // 考虑循环，取最小距离
+    const wrappedDistance = Math.min(distance, cw - distance);
+    if (wrappedDistance < minDistance) {
+      minDistance = wrappedDistance;
+      bottomParticleIndex = pi;
+    }
+  }
+  
+  // 只有当距离非常小（<5像素）时才切换，确保真正对齐
+  const switchThreshold = 5;  // 像素（减小阈值，确保真正对齐才切换）
+  if (minDistance <= switchThreshold) {
+    // 距离足够近，说明真正对齐了，更新选择
+    AppState.lastBottomParticleIndex = bottomParticleIndex;
+  }
+  // 如果距离 > 5像素，保持上次选择不变（不else，直接跳过）
+  
+  // 初始化状态
+  if (typeof AppState.lastBottomParticleIndex === 'undefined') {
+    AppState.lastBottomParticleIndex = 0;
+  }
+  
+  // 绘制蓝色虚线
+  const bottomParticleX = sx + ((t * bottomLayerV * 60 + AppState.lastBottomParticleIndex * cw / 8) % cw);
+  
+  canvasCtx.strokeStyle = isDark ? '#00D4FF' : '#1a3c7c';
+  canvasCtx.lineWidth = 2;
+  canvasCtx.setLineDash([5, 5]);  // 虚线
+  canvasCtx.beginPath();
+  canvasCtx.moveTo(topParticle1X, topParticleY);
+  canvasCtx.lineTo(bottomParticleX, bottomParticleY);
+  canvasCtx.stroke();
+  canvasCtx.setLineDash([]);  // 重置虚线
+  
+  // 绘制两个端点的小圆
+  canvasCtx.fillStyle = isDark ? '#00D4FF' : '#1a3c7c';
+  canvasCtx.beginPath();
+  canvasCtx.arc(topParticle1X, topParticleY, 5, 0, Math.PI * 2);
+  canvasCtx.fill();
+  canvasCtx.beginPath();
+  canvasCtx.arc(bottomParticleX, bottomParticleY, 5, 0, Math.PI * 2);
+  canvasCtx.fill();
 }
 
 
