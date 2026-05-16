@@ -343,10 +343,23 @@ body {
   border: none;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 0;  /* 隐藏原始文本 */
   cursor: pointer;
-  transition: all 0.3s;
   z-index: 10;
+  overflow: hidden;
+}
+
+/* 使用伪元素显示箭头 */
+.toggle-btn::before {
+  content: '◀';
+  font-size: 16px;
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 侧边栏收缩时箭头旋转180度 */
+.sidebar.collapsed .toggle-btn::before {
+  transform: rotate(180deg);
 }
 
 .toggle-btn:hover {
