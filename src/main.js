@@ -323,38 +323,67 @@ const Navigation = {
   },
 
   goToExperiment(expType) {
-    AppState.currentPage = 'experiment';
-    AppState.currentExperiment = expType;
-    
-    // 清除图表历史数据
-    AppState.dataHistory = [];
-    AppState.timeHistory = [];
-    
-    // 重置斯托克斯小球状态（顶部位置，0米）
-    AppState.stokesBallY = 0;
-    AppState.stokesBallV = 0;
-    AppState.stokesBallDistance = 0;
-    
-    // 清理之前的Canvas资源
-    cleanupCanvas();
-    
-    document.getElementById('homePage').style.display = 'none';
-    document.getElementById('experimentPage').style.display = 'block';
-    
-    const exp = EXPERIMENTS[expType];
-    document.getElementById('experimentTitle').textContent = exp.name;
-    
-    Navigation.switchSubPage('principle');
-    renderPrinciplePage();
-    renderLineSimPage();
-    
-    // 泊肃叶实验：默认应用蓖麻油预设
-    if (expType === 'poiseuille') {
-      // 延迟应用预设，确保DOM已渲染
-      setTimeout(() => {
-        applyFluidPreset('蓖麻油 (20°C)');
-      }, 100);
+    // 获取被点击的卡片
+    const clickedCard = document.querySelector(`.experiment-card[data-experiment="${expType}"]`);
+    const allCards = document.querySelectorAll('.experiment-card');
+    const cardsContainer = document.querySelector('.experiment-cards');
+      
+    // 添加展开动画类
+    if (clickedCard) {
+      clickedCard.classList.add('expanding');
+      cardsContainer.classList.add('has-expanding');
     }
+      
+    // 等待动画播放完毕后切换页面（缩短到200ms，卡片刚扩大到1.2倍时）
+    setTimeout(() => {
+      AppState.currentPage = 'experiment';
+      AppState.currentExperiment = expType;
+        
+      // 清除图表历史数据
+      AppState.dataHistory = [];
+      AppState.timeHistory = [];
+        
+      // 重置斯托克斯小球状态（顶部位置，0米）
+      AppState.stokesBallY = 0;
+      AppState.stokesBallV = 0;
+      AppState.stokesBallDistance = 0;
+        
+      // 清理之前的Canvas资源
+      cleanupCanvas();
+        
+      // 切换页面显示
+      document.getElementById('homePage').style.display = 'none';
+      const experimentPage = document.getElementById('experimentPage');
+      experimentPage.style.display = 'block';
+        
+      // 添加淡入动画
+      experimentPage.classList.add('fade-in');
+        
+      const exp = EXPERIMENTS[expType];
+      document.getElementById('experimentTitle').textContent = exp.name;
+        
+      Navigation.switchSubPage('principle');
+      renderPrinciplePage();
+      renderLineSimPage();
+        
+      // 泊肃叶实验：默认应用莴麻油预设
+      if (expType === 'poiseuille') {
+        // 延迟应用预设，确保DOM已渲染
+        setTimeout(() => {
+          applyFluidPreset('莴麻油 (20°C)');
+        }, 100);
+      }
+        
+      // 动画结束后移除类，以便下次使用（缩短到500ms）
+      setTimeout(() => {
+        experimentPage.classList.remove('fade-in');
+        // 重置所有卡片状态
+        allCards.forEach(card => {
+          card.classList.remove('expanding');
+        });
+        cardsContainer.classList.remove('has-expanding');
+      }, 500);
+    }, 200);  // 缩短等待时间，卡片刚扩大到1.2倍时切换
   },
 
   switchSubPage(pageName) {

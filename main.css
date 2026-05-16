@@ -277,6 +277,59 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* 卡片点击扩大的动画 */
+.experiment-card.expanding {
+  animation: cardExpand 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 100;
+  pointer-events: none;
+}
+
+@keyframes cardExpand {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* 其他卡片在某个卡片展开时淡出 */
+.experiment-cards.has-expanding .experiment-card:not(.expanding) {
+  animation: cardFadeOut 0.3s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes cardFadeOut {
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* 实验页面淡入动画 */
+.experiment-page.fade-in {
+  animation: pageFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.15s both;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .experiment-card:hover {
