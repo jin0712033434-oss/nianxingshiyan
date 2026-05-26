@@ -8341,6 +8341,8 @@
     isMinimized: false,
     currentTab: 'principle',
     currentMode: 'chat',
+    conversationHistory: [],  // 对话历史
+    lastQueryType: null,      // 上次问题类型
 
     // 拖拽状态
     _drag: { active: false, startX: 0, startY: 0, origLeft: 0, origTop: 0, moved: false },
@@ -8419,8 +8421,64 @@
       var panel = document.getElementById('ai-panel');
       if (panel) { panel.classList.add('open'); panel.classList.remove('minimized'); }
       this.updateWelcomeMsg();
+      
+      // 智能推荐问题
+      this.showSmartRecommendations();
+      
       var input = document.getElementById('ai-user-input');
       if (input) setTimeout(function() { input.focus(); }, 400);
+    },
+    
+    // 智能推荐问题
+    showSmartRecommendations: function() {
+      var ctx = this.getContext();
+      if (!ctx.expName || ctx.expName === '未选择') return;
+      
+      var recommendations = [];
+      
+      if (ctx.expName === '斯托克斯定律') {
+        recommendations = [
+          '当前参数下终端速度是多少？',
+          '雷诺数是多少？在什么区域？',
+          '如果半径增大一倍，速度会怎样？',
+          '时间常数τ是多少？',
+          '粘度增大对速度有什么影响？'
+        ];
+      } else if (ctx.expName === '牛顿黏性定律') {
+        recommendations = [
+          '当前速度梯度是多少？',
+          '剪切应力如何计算？',
+          '速度梯度的物理意义是什么？',
+          '粘度对剪切应力的影响？'
+        ];
+      } else if (ctx.expName === '泊肃叶定律') {
+        recommendations = [
+          '当前流量是多少？',
+          '半径对流量有什么影响？',
+          '为什么是半径四次方？',
+          '雷诺数如何计算？'
+        ];
+      }
+      
+      if (recommendations.length > 0) {
+        var recHtml = '💡 **你可能想问**：\n' +
+                      recommendations.map(function(r, i) {
+                        return '<a href="#" onclick="AIAssistant.askQuestion(\'' + r + '\'); return false;" style="color: #00d4ff; text-decoration: none; display: block; margin: 4px 0; cursor: pointer;">👉 ' + r + '</a>';
+                      }).join('\n');
+        
+        setTimeout(function() {
+          this.addAssistantMsg(recHtml, '🤖 智能推荐');
+        }.bind(this), 500);
+      }
+    },
+    
+    // 用户点击推荐问题
+    askQuestion: function(question) {
+      var input = document.getElementById('ai-user-input');
+      if (input) {
+        input.value = question;
+        this.send();
+      }
     },
 
     close: function() {
@@ -8499,12 +8557,191 @@
     },
 
     processQuery: function(text) {
+      // 记录对话历史
+      this.conversationHistory.push({ role: 'user', text: text, time: new Date() });
+      
+      // 智能问题分类
+      var queryType = this.classifyQuery(text);
+      this.lastQueryType = queryType;
+      
+      // 尝试匹配知识图谱
       var result = this.matchQuery(text);
+      
       if (result) {
+        // 找到匹配的知识条目，增强回答
         this.showEntry(result);
       } else {
-        this.addAssistantMsg('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"');
+        // 没有匹配，尝试生成上下文感知的回答
+        var contextualResponse = this.generateContextualResponse(text, queryType);
+        if (contextualResponse) {
+          this.addAssistantMsg(contextualResponse);
+        } else {
+          this.addAssistantMsg('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"');
+        }
       }
+      
+      // 记录回答
+      this.conversationHistory.push({ role: 'assistant', type: queryType, time: new Date() });
+    },
+    
+    // 智能问题分类
+    classifyQuery: function(text) {
+      var lower = text.toLowerCase();
+      
+      // 计算类问题
+      if (/计算|多少|等于|结果是/.test(lower)) {
+        return 'calculation';
+      }
+      
+      // 参数影响类问题
+      if (/影响|变化|增大|减小|如果.*会|变大|变小/.test(lower)) {
+        return 'parameter_effect';
+      }
+      
+      // 概念解释类问题
+      if (/什么|为什么|怎么|如何|是什么意思|解释/.test(lower)) {
+        return 'concept';
+      }
+      
+      // 操作指导类问题
+      if (/操作|使用|怎么.*用|步骤|方法/.test(lower)) {
+        return 'operation';
+      }
+      
+      // 对比类问题
+      if (/对比|比较|区别|差异|不同/.test(lower)) {
+        return 'comparison';
+      }
+      
+      // 默认：概念解释
+      return 'concept';
+    },
+    
+    // 生成上下文感知的回答
+    generateContextualResponse: function(text, queryType) {
+      var ctx = this.getContext();
+      var lower = text.toLowerCase();
+      
+      // 针对斯托克斯实验的上下文感知回答
+      if (ctx.expName === '斯托克斯定律' && ctx.simulationState.terminalVelocity !== undefined) {
+        var vt = ctx.simulationState.terminalVelocity;
+        var Re = ctx.simulationState.reynoldsNumber;
+        var tau = ctx.simulationState.timeConstant;
+        
+        // 询问当前参数下的物理量
+        if (/终端速度|终速|vt/.test(lower)) {
+          return '📊 **当前参数下的终端速度计算**\n\n' +
+                 '根据你设置的参数：\n' +
+                 '· 小球半径 r = ' + (ctx.params.ballRadius * 1000).toFixed(1) + ' mm\n' +
+                 '· 小球密度 ρs = ' + ctx.params.ballDensity.toFixed(0) + ' kg/m³\n' +
+                 '· 流体密度 ρf = ' + ctx.params.fluidDensity.toFixed(0) + ' kg/m³\n' +
+                 '· 粘度 μ = ' + ctx.params.viscosity.toExponential(2) + ' Pa·s\n\n' +
+                 '📐 **计算结果**：\n' +
+                 '终端速度 vt = **' + vt.toExponential(3) + ' m/s** (' + (vt * 100).toFixed(2) + ' cm/s)\n\n' +
+                 (vt > 10 ? '⚡ 速度很快！小球会在短时间内落到底部。\n' : '') +
+                 (vt < 0.01 && vt > 0 ? '🐌 速度很慢，需要耐心等待。\n' : '') +
+                 '\n💡 **提示**：点击"开始"按钮可以在动画中观察小球下落过程。';
+        }
+        
+        // 询问雷诺数
+        if (/雷诺数|Re/.test(lower)) {
+          var regime = Re < 1 ? '层流区（Re < 1）' : (Re < 1000 ? '过渡区（1 ≤ Re < 1000）' : '高雷诺数区（Re ≥ 1000）');
+          var formula = Re < 1 ? 'F = 6πμrv（线性阻力）' : 'F = 0.2πρR²v²（平方阻力）';
+          return '📊 **当前雷诺数分析**\n\n' +
+                 'Re = **' + Re.toFixed(2) + '**\n' +
+                 '流动状态：**' + regime + '**\n\n' +
+                 '📐 **使用的阻力公式**：\n' + formula + '\n\n' +
+                 (Re > 1 ? '⚠ 注意：当前雷诺数较高，已自动切换到高雷诺数阻力公式。\n' : '✅ 雷诺数较低，使用经典斯托克斯公式。\n') +
+                 '\n💡 **雷诺数的物理意义**：\n' +
+                 'Re = 惯性力 / 粘性力\n' +
+                 'Re小 → 粘性主导，流动平稳（层流）\n' +
+                 'Re大 → 惯性主导，可能出现涡旋（湍流）';
+        }
+        
+        // 询问时间常数
+        if (/时间常数|τ|多久.*达到|加速时间/.test(lower)) {
+          return '📊 **时间常数分析**\n\n' +
+                 'τ = **' + tau.toExponential(3) + ' 秒**\n\n' +
+                 '📐 **物理意义**：\n' +
+                 '· τ 是小球达到终端速度的特征时间\n' +
+                 '· 1τ 时达到 63% 的终端速度\n' +
+                 '· 3τ 时达到 95% 的终端速度\n' +
+                 '· 5τ 时达到 99% 的终端速度\n\n' +
+                 '⏱ **达到终端速度需要**：' + (5 * tau).toFixed(3) + ' 秒\n\n' +
+                 (tau < 0.1 ? '⚡ 时间常数很小，小球几乎瞬间达到终端速度。\n' : '') +
+                 (tau > 10 ? '🐌 时间常数较大，小球需要较长时间加速。\n' : '');
+        }
+        
+        // 询问参数影响
+        if (queryType === 'parameter_effect') {
+          if (/半径|r/.test(lower) && /增大|增加|变大/.test(lower)) {
+            var newVt = ((ctx.params.ballRadius * 1.5) * (ctx.params.ballRadius * 1.5) * 
+                        (ctx.params.ballDensity - ctx.params.fluidDensity) * 9.8) / 
+                        (9 * ctx.params.viscosity);
+            return '📊 **半径增大的影响分析**\n\n' +
+                   '如果半径增大 50%（从 ' + (ctx.params.ballRadius * 1000).toFixed(1) + ' mm → ' + (ctx.params.ballRadius * 1500).toFixed(1) + ' mm）：\n\n' +
+                   '📐 **理论预测**：\n' +
+                   '· 终端速度 vt ∝ r²（平方关系）\n' +
+                   '· 速度会变为原来的 (1.5)² = **2.25 倍**\n\n' +
+                   '📊 **数值对比**：\n' +
+                   '· 当前 vt = ' + vt.toExponential(2) + ' m/s\n' +
+                   '· 增大后 vt ≈ ' + newVt.toExponential(2) + ' m/s\n\n' +
+                   '💡 **物理原因**：\n' +
+                   '虽然阻力也增大（Fd ∝ r），但重力增加更快（Fg ∝ r³），所以大球下沉更快。';
+          }
+          
+          if (/粘度|μ/.test(lower) && /增大|增加|变大/.test(lower)) {
+            var newVt2 = (2 * ctx.params.ballRadius * ctx.params.ballRadius * 
+                         (ctx.params.ballDensity - ctx.params.fluidDensity) * 9.8) / 
+                         (9 * ctx.params.viscosity * 2);
+            return '📊 **粘度增大的影响分析**\n\n' +
+                   '如果粘度增大 100%（从 ' + ctx.params.viscosity.toExponential(2) + ' → ' + (ctx.params.viscosity * 2).toExponential(2) + ' Pa·s）：\n\n' +
+                   '📐 **理论预测**：\n' +
+                   '· 终端速度 vt ∝ 1/μ（反比关系）\n' +
+                   '· 速度会变为原来的 **1/2**\n\n' +
+                   '📊 **数值对比**：\n' +
+                   '· 当前 vt = ' + vt.toExponential(2) + ' m/s\n' +
+                   '· 增大后 vt ≈ ' + newVt2.toExponential(2) + ' m/s\n\n' +
+                   '💡 **物理原因**：\n' +
+                   '粘度越大，流体内部摩擦力越强，对小球的阻力越大。';
+          }
+        }
+      }
+      
+      // 针对牛顿实验的上下文感知回答
+      if (ctx.expName === '牛顿黏性定律' && ctx.simulationState.velocityGradient !== undefined) {
+        if (/速度梯度|du\/dz/.test(lower)) {
+          return '📊 **当前速度梯度计算**\n\n' +
+                 '根据你设置的参数：\n' +
+                 '· 上板速度 U = ' + ctx.params.velocity.toFixed(2) + ' m/s\n' +
+                 '· 板间距 z = ' + ctx.params.gap.toExponential(2) + ' m\n\n' +
+                 '📐 **计算结果**：\n' +
+                 '速度梯度 du/dz = U/z = **' + ctx.simulationState.velocityGradient.toFixed(2) + ' s⁻¹**\n\n' +
+                 '📊 **剪切应力**：\n' +
+                 'τ = μ × (du/dz) = **' + ctx.simulationState.shearStress.toExponential(3) + ' Pa**\n\n' +
+                 '💡 **物理意义**：\n' +
+                 '速度梯度越大，流体层之间的速度变化越剧烈，产生的内摩擦力（剪切应力）也越大。';
+        }
+      }
+      
+      // 针对泊肃叶实验的上下文感知回答
+      if (ctx.expName === '泊肃叶定律' && ctx.simulationState.flowRate !== undefined) {
+        if (/流量|Q/.test(lower)) {
+          return '📊 **当前流量计算**\n\n' +
+                 '根据你设置的参数：\n' +
+                 '· 管道半径 R = ' + (ctx.params.radius * 1000).toFixed(1) + ' mm\n' +
+                 '· 压强差 ΔP = ' + ctx.params.pressure.toFixed(0) + ' Pa\n' +
+                 '· 粘度 μ = ' + ctx.params.viscosity.toExponential(2) + ' Pa·s\n' +
+                 '· 管长 L = ' + ctx.params.length.toFixed(2) + ' m\n\n' +
+                 '📐 **计算结果**：\n' +
+                 '流量 Q = **' + ctx.simulationState.flowRate.toExponential(3) + ' m³/s**\n' +
+                 '       = **' + (ctx.simulationState.flowRate * 1000000).toFixed(3) + ' mL/s**\n\n' +
+                 '💡 **注意**：流量与半径的四次方成正比（Q ∝ R⁴），管径的微小变化会显著影响流量。';
+        }
+      }
+      
+      // 如果没有特殊处理，返回null
+      return null;
     },
 
     matchQuery: function(text) {
@@ -8545,25 +8782,148 @@
     showEntry: function(entry) {
       var ctx = this.getContext();
       var resp = entry.response;
+      
+      // 替换参数占位符
       if (ctx.params) {
         Object.keys(ctx.params).forEach(function(k) {
           resp = resp.replace('{' + k + '}', ctx.params[k]);
         });
       }
       if (ctx.expName) resp = resp.replace('{expName}', ctx.expName);
+      
+      // 添加上下文分析（如果可用）
+      var contextEnhancement = this.getContextEnhancement(ctx);
+      if (contextEnhancement) {
+        resp += '\n\n' + contextEnhancement;
+      }
+      
       this.addAssistantMsg(resp, entry.title);
+    },
+    
+    // 根据上下文增强回答
+    getContextEnhancement: function(ctx) {
+      if (!ctx.simulationState || Object.keys(ctx.simulationState).length === 0) {
+        return null;
+      }
+      
+      var enhancement = '📊 **当前实验状态**\n';
+      
+      if (ctx.expName === '斯托克斯定律') {
+        if (ctx.simulationState.terminalVelocity !== undefined) {
+          var vt = ctx.simulationState.terminalVelocity;
+          var Re = ctx.simulationState.reynoldsNumber;
+          enhancement += '· 终端速度: ' + vt.toExponential(2) + ' m/s\n';
+          enhancement += '· 雷诺数: ' + Re.toFixed(2);
+          if (Re < 1) {
+            enhancement += ' (层流区)\n';
+          } else {
+            enhancement += ' (高雷诺数区)\n';
+          }
+          
+          if (ctx.simulationState.recommendations && ctx.simulationState.recommendations.length > 0) {
+            enhancement += '\n💡 **建议**：\n';
+            enhancement += ctx.simulationState.recommendations.join('\n');
+          }
+        }
+      } else if (ctx.expName === '牛顿黏性定律') {
+        if (ctx.simulationState.velocityGradient !== undefined) {
+          enhancement += '· 速度梯度: ' + ctx.simulationState.velocityGradient.toFixed(2) + ' s⁻¹\n';
+          enhancement += '· 剪切应力: ' + ctx.simulationState.shearStress.toExponential(3) + ' Pa';
+        }
+      } else if (ctx.expName === '泊肃叶定律') {
+        if (ctx.simulationState.flowRate !== undefined) {
+          enhancement += '· 流量: ' + ctx.simulationState.flowRate.toExponential(3) + ' m³/s\n';
+          enhancement += '         = ' + (ctx.simulationState.flowRate * 1000000).toFixed(3) + ' mL/s';
+        }
+      }
+      
+      return enhancement;
     },
 
     getContext: function() {
       var exp = AppState.currentExperiment;
       var expNames = { newton: '牛顿黏性定律', poiseuille: '泊肃叶定律', stokes: '斯托克斯定律' };
-      var ctx = { expName: expNames[exp] || '未选择', params: {} };
+      var ctx = { expName: expNames[exp] || '未选择', params: {}, simulationState: {} };
+      
       if (exp) {
         try {
           var vals = getParamValues();
           ctx.params = vals;
-        } catch(e) {}
+          
+          // 获取仿真状态
+          if (exp === 'stokes') {
+            ctx.simulationState.isRunning = AppState.simulationRunning;
+            ctx.simulationState.ballY = AppState.stokesBallY;
+            ctx.simulationState.velocity = AppState.stokesBallV;
+            ctx.simulationState.distance = AppState.stokesBallDistance;
+            
+            // 计算物理量
+            if (vals.viscosity && vals.ballRadius && vals.ballDensity && vals.fluidDensity) {
+              var r = vals.ballRadius;
+              var mu = vals.viscosity;
+              var rhos = vals.ballDensity;
+              var rhof = vals.fluidDensity;
+              var g = 9.8;
+              
+              // 终端速度
+              var vt = (2 * r * r * (rhos - rhof) * g) / (9 * mu);
+              ctx.simulationState.terminalVelocity = vt;
+              
+              // 雷诺数
+              var Re = (rhof * Math.abs(vt) * 2 * r) / mu;
+              ctx.simulationState.reynoldsNumber = Re;
+              
+              // 时间常数
+              var volume = (4/3) * Math.PI * Math.pow(r, 3);
+              var mass = rhos * volume;
+              var tau = mass / (6 * Math.PI * mu * r);
+              ctx.simulationState.timeConstant = tau;
+              
+              // 判断当前状态
+              if (AppState.stokesBallY >= 0.99) {
+                ctx.simulationState.status = '小球已到达底部';
+              } else if (AppState.simulationRunning) {
+                ctx.simulationState.status = '小球正在下落';
+              } else {
+                ctx.simulationState.status = '仿真未开始';
+              }
+              
+              // 根据参数给出建议
+              ctx.simulationState.recommendations = [];
+              if (Re > 1) {
+                ctx.simulationState.recommendations.push('⚠ 雷诺数较高(Re=' + Re.toFixed(2) + ')，建议使用高雷诺数阻力公式');
+              }
+              if (vt > 100) {
+                ctx.simulationState.recommendations.push('⚡ 终端速度很高(' + vt.toFixed(1) + ' m/s)，小球会很快落到底部');
+              } else if (vt < 0.01 && vt > 0) {
+                ctx.simulationState.recommendations.push('🐌 终端速度很低(' + vt.toFixed(4) + ' m/s)，小球下落很慢');
+              }
+              if (mu > 1.0) {
+                ctx.simulationState.recommendations.push('💧 高粘度流体，阻力较大');
+              } else if (mu < 0.001) {
+                ctx.simulationState.recommendations.push('💨 低粘度流体，接近理想流体');
+              }
+            }
+          } else if (exp === 'newton') {
+            ctx.simulationState.isRunning = AppState.simulationRunning;
+            if (vals.velocity && vals.gap && vals.viscosity) {
+              var du_dz = vals.velocity / vals.gap;
+              var tau = vals.viscosity * du_dz;
+              ctx.simulationState.velocityGradient = du_dz;
+              ctx.simulationState.shearStress = tau;
+            }
+          } else if (exp === 'poiseuille') {
+            ctx.simulationState.isRunning = AppState.simulationRunning;
+            if (vals.radius && vals.pressure && vals.viscosity && vals.length) {
+              var Q = (Math.PI * vals.pressure * Math.pow(vals.radius, 4)) / (8 * vals.viscosity * vals.length);
+              ctx.simulationState.flowRate = Q;
+            }
+          }
+        } catch(e) {
+          console.log('获取上下文失败:', e);
+        }
       }
+      
       return ctx;
     },
 
