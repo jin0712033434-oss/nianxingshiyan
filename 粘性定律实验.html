@@ -8343,6 +8343,7 @@
     currentMode: 'chat',
     conversationHistory: [],  // 对话历史
     lastQueryType: null,      // 上次问题类型
+    visualizationMode: null,  // 可视化模式
 
     // 拖拽状态
     _drag: { active: false, startX: 0, startY: 0, origLeft: 0, origTop: 0, moved: false },
@@ -8441,22 +8442,27 @@
           '当前参数下终端速度是多少？',
           '雷诺数是多少？在什么区域？',
           '如果半径增大一倍，速度会怎样？',
-          '时间常数τ是多少？',
-          '粘度增大对速度有什么影响？'
+          '显示公式推导',
+          '显示参数影响',
+          '对比水和蜂蜜',
+          '学习引导'
         ];
       } else if (ctx.expName === '牛顿黏性定律') {
         recommendations = [
           '当前速度梯度是多少？',
           '剪切应力如何计算？',
-          '速度梯度的物理意义是什么？',
-          '粘度对剪切应力的影响？'
+          '显示公式推导',
+          '显示参数影响',
+          '学习引导'
         ];
       } else if (ctx.expName === '泊肃叶定律') {
         recommendations = [
           '当前流量是多少？',
           '半径对流量有什么影响？',
-          '为什么是半径四次方？',
-          '雷诺数如何计算？'
+          '显示公式推导',
+          '显示参数影响',
+          '对比不同管径',
+          '学习引导'
         ];
       }
       
@@ -8479,6 +8485,364 @@
         input.value = question;
         this.send();
       }
+    },
+    
+    // ========== 可视化辅助教学功能 ==========
+    
+    // 1. 公式推导动画
+    showFormulaDerivation: function() {
+      var ctx = this.getContext();
+      var derivation = '';
+      
+      if (ctx.expName === '斯托克斯定律') {
+        derivation = '📐 **斯托克斯定律公式推导**\n\n' +
+                     '**第一步：受力分析**\n' +
+                     '小球在流体中受到三个力：\n' +
+                     '· 重力 Fg = (4/3)πR³ρs·g\n' +
+                     '· 浮力 Fb = (4/3)πR³ρf·g\n' +
+                     '· 阻力 Fd = 6πμRv\n\n' +
+                     '**第二步：力平衡条件**\n' +
+                     '当达到终端速度时：\n' +
+                     'Fg = Fb + Fd\n\n' +
+                     '**第三步：代入公式**\n' +
+                     '(4/3)πR³ρs·g = (4/3)πR³ρf·g + 6πμRvt\n\n' +
+                     '**第四步：移项**\n' +
+                     '(4/3)πR³(ρs-ρf)g = 6πμRvt\n\n' +
+                     '**第五步：解出vt**\n' +
+                     'vt = (2R²(ρs-ρf)g) / (9μ)\n\n' +
+                     '✅ **这就是终端速度公式！**\n\n' +
+                     '💡 **关键洞察**：\n' +
+                     '· vt ∝ R²（半径平方）\n' +
+                     '· vt ∝ (ρs-ρf)（密度差）\n' +
+                     '· vt ∝ 1/μ（粘度倒数）';
+      } else if (ctx.expName === '牛顿黏性定律') {
+        derivation = '📐 **牛顿黏性定律公式推导**\n\n' +
+                     '**第一步：实验观察**\n' +
+                     '上下板间流体速度呈线性分布：\n' +
+                     'v(y) = (U/z)·y\n\n' +
+                     '**第二步：定义速度梯度**\n' +
+                     'du/dz = U/z\n\n' +
+                     '**第三步：测量剪切应力**\n' +
+                     'τ = F/A\n\n' +
+                     '**第四步：实验发现**\n' +
+                     'τ 与 du/dz 成正比：\n' +
+                     'τ ∝ du/dz\n\n' +
+                     '**第五步：引入比例系数μ**\n' +
+                     'τ = μ·(du/dz)\n\n' +
+                     '**第六步：导出力形式**\n' +
+                     'F = τ·A = μ·A·(U/z)\n\n' +
+                     '✅ **这就是牛顿黏性定律！**\n\n' +
+                     '💡 **物理意义**：\n' +
+                     '· μ是流体的固有属性\n' +
+                     '· 速度梯度越大，剪切应力越大\n' +
+                     '· 适用于层流状态的牛顿流体';
+      } else if (ctx.expName === '泊肃叶定律') {
+        derivation = '📐 **泊肃叶定律公式推导**\n\n' +
+                     '**第一步：纳维-斯托克斯方程**\n' +
+                     '在圆管层流中简化为：\n' +
+                     'μ·(1/r)·d/dr(r·du/dr) = dP/dx\n\n' +
+                     '**第二步：积分求解速度分布**\n' +
+                     'u(r) = (ΔP/(4μL))·(R²-r²)\n\n' +
+                     '**第三步：抛物线分布**\n' +
+                     '管中心(r=0)速度最大：\n' +
+                     'u_max = (ΔP·R²)/(4μL)\n\n' +
+                     '**第四步：积分求流量**\n' +
+                     'Q = ∫₀ᴿ 2πr·u(r)dr\n\n' +
+                     '**第五步：计算积分**\n' +
+                     'Q = (π·ΔP·R⁴)/(8μL)\n\n' +
+                     '✅ **这就是泊肃叶定律！**\n\n' +
+                     '💡 **关键特性**：\n' +
+                     '· Q ∝ R⁴（半径四次方！）\n' +
+                     '· Q ∝ ΔP（压差正比）\n' +
+                     '· Q ∝ 1/μ（粘度反比）';
+      } else {
+        derivation = '请先选择一个实验，我会为你展示对应的公式推导过程。';
+      }
+      
+      this.addAssistantMsg(derivation, '📐 公式推导');
+    },
+    
+    // 2. 参数影响可视化
+    showParameterVisualization: function() {
+      var ctx = this.getContext();
+      var visualization = '';
+      
+      if (ctx.expName === '斯托克斯定律' && ctx.params.ballRadius) {
+        var r = ctx.params.ballRadius;
+        var mu = ctx.params.viscosity;
+        var rhos = ctx.params.ballDensity;
+        var rhof = ctx.params.fluidDensity;
+        var g = 9.8;
+        
+        // 计算不同半径下的终端速度
+        var radii = [r * 0.5, r * 0.75, r, r * 1.25, r * 1.5, r * 2];
+        var velocities = radii.map(function(ri) {
+          return (2 * ri * ri * (rhos - rhof) * g) / (9 * mu);
+        });
+        
+        // 计算不同粘度下的终端速度
+        var viscosities = [mu * 0.25, mu * 0.5, mu, mu * 2, mu * 4, mu * 8];
+        var velByViscosity = viscosities.map(function(mui) {
+          return (2 * r * r * (rhos - rhof) * g) / (9 * mui);
+        });
+        
+        visualization = '📊 **参数影响可视化 - 斯托克斯定律**\n\n' +
+                        '**1️⃣ 半径对终端速度的影响（vt ∝ r²）**\n' +
+                        '```\n' +
+                        '半径(mm)  | 速度(m/s)  | 相对倍数\n' +
+                        radii.map(function(ri, i) {
+                          return (ri * 1000).toFixed(2) + '      | ' + velocities[i].toExponential(2) + ' | ' + (velocities[i] / velocities[2]).toFixed(2) + '×';
+                        }).join('\n') +
+                        '\n```\n\n' +
+                        '**2️⃣ 粘度对终端速度的影响（vt ∝ 1/μ）**\n' +
+                        '```\n' +
+                        '粘度(Pa·s) | 速度(m/s)  | 相对倍数\n' +
+                        viscosities.map(function(mui, i) {
+                          return mui.toExponential(2) + ' | ' + velByViscosity[i].toExponential(2) + ' | ' + (velByViscosity[i] / velByViscosity[2]).toFixed(2) + '×';
+                        }).join('\n') +
+                        '\n```\n\n' +
+                        '📈 **趋势总结**：\n' +
+                        '· 半径增大 2 倍 → 速度增大 4 倍（平方关系）\n' +
+                        '· 粘度增大 2 倍 → 速度减小到 1/2（反比关系）\n' +
+                        '\n💡 **交互提示**：在左侧面板调节参数，可以实时观察动画变化！';
+      } else if (ctx.expName === '泊肃叶定律' && ctx.params.radius) {
+        var R = ctx.params.radius;
+        var mu = ctx.params.viscosity;
+        var dP = ctx.params.pressure;
+        var L = ctx.params.length;
+        
+        // 计算不同半径下的流量
+        var radii = [R * 0.5, R * 0.75, R, R * 1.25, R * 1.5, R * 2];
+        var flowRates = radii.map(function(Ri) {
+          return (Math.PI * dP * Math.pow(Ri, 4)) / (8 * mu * L);
+        });
+        
+        visualization = '📊 **参数影响可视化 - 泊肃叶定律**\n\n' +
+                        '**半径对流量的影响（Q ∝ R⁴）**\n' +
+                        '```\n' +
+                        '半径(mm)  | 流量(m³/s)    | 相对倍数\n' +
+                        radii.map(function(Ri, i) {
+                          return (Ri * 1000).toFixed(2) + '      | ' + flowRates[i].toExponential(3) + ' | ' + (flowRates[i] / flowRates[2]).toFixed(1) + '×';
+                        }).join('\n') +
+                        '\n```\n\n' +
+                        '📈 **关键发现**：\n' +
+                        '· 半径增大 2 倍 → 流量增大 16 倍（四次方！）\n' +
+                        '· 半径增大 1.5 倍 → 流量增大 5.06 倍\n' +
+                        '\n💡 **这就是为什么血管狭窄很危险！**\n半径减小 50% → 血流量减少到 1/16！';
+      } else if (ctx.expName === '牛顿黏性定律' && ctx.params.velocity) {
+        var U = ctx.params.velocity;
+        var z = ctx.params.gap;
+        var mu = ctx.params.viscosity;
+        
+        // 计算不同速度下的剪切应力
+        var velocities = [U * 0.25, U * 0.5, U, U * 1.5, U * 2, U * 3];
+        var shearStresses = velocities.map(function(Ui) {
+          return mu * (Ui / z);
+        });
+        
+        visualization = '📊 **参数影响可视化 - 牛顿黏性定律**\n\n' +
+                        '**速度对剪切应力的影响（τ ∝ U）**\n' +
+                        '```\n' +
+                        '速度(m/s) | 剪切应力(Pa) | 相对倍数\n' +
+                        velocities.map(function(Ui, i) {
+                          return Ui.toFixed(3) + '    | ' + shearStresses[i].toExponential(3) + ' | ' + (shearStresses[i] / shearStresses[2]).toFixed(2) + '×';
+                        }).join('\n') +
+                        '\n```\n\n' +
+                        '📈 **线性关系**：\n' +
+                        '· 速度增大 2 倍 → 剪切应力增大 2 倍\n' +
+                        '· 速度增大 3 倍 → 剪切应力增大 3 倍\n' +
+                        '\n💡 **这是牛顿流体的核心特征！**';
+      } else {
+        visualization = '请先选择一个实验并设置参数，我会为你展示参数影响趋势图。';
+      }
+      
+      this.addAssistantMsg(visualization, '📊 参数影响可视化');
+    },
+    
+    // 3. 对比演示
+    showComparisonDemo: function() {
+      var ctx = this.getContext();
+      var comparison = '';
+      
+      if (ctx.expName === '斯托克斯定律') {
+        var r = ctx.params.ballRadius || 0.004;
+        var rhos = ctx.params.ballDensity || 2500;
+        var g = 9.8;
+        
+        // 不同流体的对比
+        var fluids = [
+          { name: '水', mu: 0.001, rhof: 1000, emoji: '💧' },
+          { name: '橄榄油', mu: 0.08, rhof: 920, emoji: '🫒' },
+          { name: '甘油', mu: 1.5, rhof: 1260, emoji: '🧴' },
+          { name: '蜂蜜', mu: 10, rhof: 1420, emoji: '🍯' }
+        ];
+        
+        var results = fluids.map(function(fluid) {
+          var vt = (2 * r * r * (rhos - fluid.rhof) * g) / (9 * fluid.mu);
+          var Re = (fluid.rhof * vt * 2 * r) / fluid.mu;
+          return {
+            name: fluid.name,
+            emoji: fluid.emoji,
+            mu: fluid.mu,
+            vt: vt,
+            Re: Re,
+            time: vt > 0 ? (1 / vt) : Infinity  // 下落1米所需时间
+          };
+        });
+        
+        comparison = '🔬 **流体对比演示 - 斯托克斯定律**\n\n' +
+                     '**相同小球在不同流体中的沉降速度**\n' +
+                     '小球半径: ' + (r * 1000).toFixed(1) + ' mm, 密度: ' + rhos + ' kg/m³\n\n' +
+                     '```\n' +
+                     '流体    | 粘度(Pa·s) | 终端速度  | 下落1米时间\n' +
+                     results.map(function(res) {
+                       var timeStr = res.time < 1000 ? res.time.toFixed(2) + '秒' : (res.time / 60).toFixed(1) + '分钟';
+                       return res.emoji + ' ' + res.name.padEnd(6) + ' | ' + res.mu.toExponential(2) + '   | ' + res.vt.toExponential(2) + ' m/s | ' + timeStr;
+                     }).join('\n') +
+                     '\n```\n\n' +
+                     '📈 **关键发现**：\n' +
+                     '· 水中沉降速度是蜂蜜中的 **10000 倍**！\n' +
+                     '· 甘油中速度约是水中的 **1/1500**\n' +
+                     '\n💡 **实际体验**：\n' +
+                     '· 在水中：小球“嗖”地一下就下去了\n' +
+                     '· 在蜂蜜中：小球像在“散步”\n' +
+                     '\n🎮 **试试对比模式**：\n' +
+                     '点击顶部“🔀 开启对比模式”，可以同时观察3种流体！';
+      } else if (ctx.expName === '泊肃叶定律') {
+        var dP = ctx.params.pressure || 1000;
+        var mu = ctx.params.viscosity || 0.001;
+        var L = ctx.params.length || 1;
+        
+        // 不同管径的对比
+        var pipes = [
+          { name: '细管', R: 0.001, emoji: '🔹' },
+          { name: '中细管', R: 0.002, emoji: '🔸' },
+          { name: '中管', R: 0.003, emoji: '🟢' },
+          { name: '粗管', R: 0.005, emoji: '🔴' }
+        ];
+        
+        var results2 = pipes.map(function(pipe) {
+          var Q = (Math.PI * dP * Math.pow(pipe.R, 4)) / (8 * mu * L);
+          return {
+            name: pipe.name,
+            emoji: pipe.emoji,
+            R: pipe.R,
+            Q: Q,
+            relative: Q / ((Math.PI * dP * Math.pow(0.001, 4)) / (8 * mu * L))
+          };
+        });
+        
+        comparison = '🔬 **管径对比演示 - 泊肃叶定律**\n\n' +
+                     '**不同管径下的流量对比**\n' +
+                     '压差: ' + dP + ' Pa, 粘度: ' + mu.toExponential(2) + ' Pa·s\n\n' +
+                     '```\n' +
+                     '管道    | 半径(mm) | 流量(m³/s)    | 相对倍数\n' +
+                     results2.map(function(res) {
+                       return res.emoji + ' ' + res.name.padEnd(6) + ' | ' + (res.R * 1000).toFixed(1) + '      | ' + res.Q.toExponential(3) + ' | ' + res.relative.toFixed(1) + '×';
+                     }).join('\n') +
+                     '\n```\n\n' +
+                     '📈 **震撼的R⁴效应**：\n' +
+                     '· 5mm管流量是1mm管的 **625 倍**！\n' +
+                     '· 3mm管流量是1mm管的 **81 倍**\n' +
+                     '\n💡 **这就是为什么：\n' +
+                     '· 心血管狭窄很危险（半径↓50% → 流量↓94%）\n' +
+                     '· 输油管道要做得很粗\n' +
+                     '· 吸管比针管容易喝到饮料';
+      } else {
+        comparison = '请先选择斯托克斯或泊肃叶实验，我会为你展示不同流体/管径的对比数据。';
+      }
+      
+      this.addAssistantMsg(comparison, '🔬 对比演示');
+    },
+    
+    // 4. 学习引导
+    showLearningGuide: function() {
+      var ctx = this.getContext();
+      var guide = '';
+      
+      if (ctx.expName === '斯托克斯定律') {
+        guide = '🎓 **斯托克斯定律 - 学习引导**\n\n' +
+                '**阶段1️⃣：基础观察（5分钟）**\n' +
+                '1. 使用默认参数，点击“开始”\n' +
+                '2. 观察小球下落过程\n' +
+                '3. 注意：小球先加速，后匀速\n' +
+                '👉 问题：为什么小球会从加速变为匀速？\n\n' +
+                '**阶段2️⃣：参数探索（10分钟）**\n' +
+                '1. 将半径从 4mm 改为 2mm\n' +
+                '2. 观察速度变化\n' +
+                '3. 再将半径改为 8mm\n' +
+                '👉 问题：半径增大2倍，速度变化了多少？\n\n' +
+                '**阶段3️⃣：对比实验（10分钟）**\n' +
+                '1. 开启对比模式\n' +
+                '2. 设置 A: r=2mm, B: r=4mm, C: r=8mm\n' +
+                '3. 同时观察三个小球\n' +
+                '👉 验证：速度是否与半径平方成正比？\n\n' +
+                '**阶段4️⃣：深入思考（5分钟）**\n' +
+                '1. 尝试极高粘度（μ=10 Pa·s）\n' +
+                '2. 尝试极低粘度（μ=0.0001 Pa·s）\n' +
+                '3. 查看雷诺数\n' +
+                '👉 问题：什么情况下斯托克斯定律不适用？\n\n' +
+                '💡 **学习提示**：\n' +
+                '· 随时问我问题，比如“雷诺数是什么？”\n' +
+                '· 点击“显示公式推导”理解公式来源\n' +
+                '· 点击“显示参数影响”查看趋势图';
+      } else if (ctx.expName === '牛顿黏性定律') {
+        guide = '🎓 **牛顿黏性定律 - 学习引导**\n\n' +
+                '**阶段1️⃣：观察速度分布（5分钟）**\n' +
+                '1. 使用默认参数，点击“开始”\n' +
+                '2. 观察粒子运动：上层快，下层慢\n' +
+                '3. 注意蓝色速度梯度线\n' +
+                '👉 问题：速度分布为什么是直线？\n\n' +
+                '**阶段2️⃣：探索粘度影响（10分钟）**\n' +
+                '1. 将粘度从 0.001 改为 0.1\n' +
+                '2. 观察粒子速度变化\n' +
+                '3. 改为 1.0，再观察\n' +
+                '👉 问题：粘度增大，速度如何变化？\n\n' +
+                '**阶段3️⃣：理解速度梯度（10分钟）**\n' +
+                '1. 将板间距从 0.01m 改为 0.005m\n' +
+                '2. 观察速度梯度线的斜率变化\n' +
+                '3. 问AI：“速度梯度是多少？”\n' +
+                '👉 验证：间距减半，梯度是否加倍？\n\n' +
+                '**阶段4️⃣：实际应用思考（5分钟）**\n' +
+                '1. 思考：为什么机油比水黏？\n' +
+                '2. 尝试极高粘度（蜂蜜）\n' +
+                '3. 尝试极低粘度（空气）\n' +
+                '👉 问题：哪些是牛顿流体？哪些不是？\n\n' +
+                '💡 **学习提示**：\n' +
+                '· 随时问我问题\n' +
+                '· 点击“显示公式推导”\n' +
+                '· 尝试计算剪切应力';
+      } else if (ctx.expName === '泊肃叶定律') {
+        guide = '🎓 **泊肃叶定律 - 学习引导**\n\n' +
+                '**阶段1️⃣：观察抛物线分布（5分钟）**\n' +
+                '1. 使用默认参数，点击“开始”\n' +
+                '2. 观察3D管道中粒子运动\n' +
+                '3. 注意：中心快，边缘慢\n' +
+                '👉 问题：速度分布为什么是抛物线？\n\n' +
+                '**阶段2️⃣：探索R⁴效应（15分钟）**\n' +
+                '1. 将半径从 2mm 改为 4mm（2倍）\n' +
+                '2. 观察流量变化\n' +
+                '3. 问AI：“流量是多少？”\n' +
+                '👉 验证：半径2倍，流量是否16倍？\n\n' +
+                '**阶段3️⃣：对比不同管径（10分钟）**\n' +
+                '1. 点击“显示对比演示”\n' +
+                '2. 查看1mm到5mm的流量对比\n' +
+                '3. 思考为什么血管狭窄很危险\n' +
+                '👉 问题：半径减少50%，血流量减少多少？\n\n' +
+                '**阶段4️⃣：理解雷诺数（5分钟）**\n' +
+                '1. 尝试极高流速\n' +
+                '2. 计算雷诺数\n' +
+                '3. 观察何时转为湍流\n' +
+                '👉 问题：泊肃叶定律什么时候不适用？\n\n' +
+                '💡 **学习提示**：\n' +
+                '· 在3D视图中旋转观察\n' +
+                '· 点击“显示公式推导”\n' +
+                '· 联系实际：心血管、管道工程';
+      } else {
+        guide = '请先选择一个实验，我会为你提供详细的学习路径指导。';
+      }
+      
+      this.addAssistantMsg(guide, '🎓 学习引导');
     },
 
     close: function() {
@@ -8564,6 +8928,11 @@
       var queryType = this.classifyQuery(text);
       this.lastQueryType = queryType;
       
+      // 检查是否是可视化命令
+      if (this.handleVisualizationCommand(text)) {
+        return;
+      }
+      
       // 尝试匹配知识图谱
       var result = this.matchQuery(text);
       
@@ -8576,12 +8945,43 @@
         if (contextualResponse) {
           this.addAssistantMsg(contextualResponse);
         } else {
-          this.addAssistantMsg('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"');
+          this.addAssistantMsg('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"\n\n💡 可视化命令：\n· "显示公式推导" - 查看公式逐步推导\n· "显示参数影响" - 查看参数变化趋势图\n· "对比水和蜂蜜" - 一键对比不同流体');
         }
       }
       
       // 记录回答
       this.conversationHistory.push({ role: 'assistant', type: queryType, time: new Date() });
+    },
+    
+    // 处理可视化命令
+    handleVisualizationCommand: function(text) {
+      var lower = text.toLowerCase();
+      
+      // 公式推导
+      if (/公式推导|推导过程|怎么来的|如何得出/.test(lower)) {
+        this.showFormulaDerivation();
+        return true;
+      }
+      
+      // 参数影响可视化
+      if (/参数影响|变化趋势|参数对比|可视化.*参数/.test(lower)) {
+        this.showParameterVisualization();
+        return true;
+      }
+      
+      // 对比演示
+      if (/对比.*和|比较.*和|水.*蜂蜜|蜂蜜.*水/.test(lower)) {
+        this.showComparisonDemo();
+        return true;
+      }
+      
+      // 学习引导
+      if (/学习引导|步骤指导|循序渐进|新手/.test(lower)) {
+        this.showLearningGuide();
+        return true;
+      }
+      
+      return false;
     },
     
     // 智能问题分类
