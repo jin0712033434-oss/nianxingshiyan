@@ -8499,14 +8499,19 @@
     },
 
     open: function() {
+      // 如果已经打开，不重复显示智能推荐
+      var wasAlreadyOpen = this.isOpen;
+      
       this.isOpen = true;
       this.isMinimized = false;
       var panel = document.getElementById('ai-panel');
       if (panel) { panel.classList.add('open'); panel.classList.remove('minimized'); }
       this.updateWelcomeMsg();
       
-      // 智能推荐问题
-      this.showSmartRecommendations();
+      // 只在第一次打开时显示智能推荐
+      if (!wasAlreadyOpen) {
+        this.showSmartRecommendations();
+      }
       
       var input = document.getElementById('ai-user-input');
       if (input) setTimeout(function() { input.focus(); }, 400);

@@ -6,9 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="df897b0e-403d-4da7-8c8b-87f139b17234" name="Changes" comment="Changes">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/node_modules/.vite/deps_temp_a967eb76/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/粘性定律实验.html" beforeDir="false" afterPath="$PROJECT_DIR$/粘性定律实验.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -107,7 +104,7 @@
       <workItem from="1779794449314" duration="1822000" />
       <workItem from="1779797246321" duration="1804000" />
       <workItem from="1779799074821" duration="10473000" />
-      <workItem from="1779852281312" duration="398000" />
+      <workItem from="1779852281312" duration="1590000" />
     </task>
     <servers />
   </component>
