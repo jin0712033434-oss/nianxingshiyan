@@ -101,7 +101,7 @@ const EXPERIMENTS = {
     params: [
       { id: 'radius', name: '管道半径 R', symbol: 'R', unit: 'm', min: 0.0005, max: 0.005, step: 0.0001, value: 0.002 },
       { id: 'length', name: '管道长度 L', symbol: 'L', unit: 'm', min: 0.1, max: 2.0, step: 0.05, value: 1.0 },
-      { id: 'pressure', name: '压强差 ΔP', symbol: 'ΔP', unit: 'Pa', min: 100, max: 100000, step: 100, value: 1000 },
+      { id: 'pressure', name: '压强差 ΔP', symbol: 'ΔP', unit: 'Pa', min: 102, max: 105, step: 0.01, value: 1000 },
       { id: 'viscosity', name: '动力黏度 μ', symbol: 'μ', unit: 'Pa·s', min: 0.00005, max: 2.0, step: 0.00005, value: 0.001, useFluidPreset: true },
       { id: 'density', name: '流体密度 ρ', symbol: 'ρ', unit: 'kg/m³', min: 0.05, max: 1500, step: 0.5, value: 1000, useFluidPreset: true }
     ]
@@ -363,16 +363,15 @@ const Navigation = {
       document.getElementById('experimentTitle').textContent = exp.name;
         
       Navigation.switchSubPage('principle');
+            
+      // 泊肃叶实验：先应用预设，再渲染页面（避免雷诺数警告误报）
+      if (expType === 'poiseuille') {
+        // 立即应用预设，不延迟
+        applyFluidPreset('蓖麻油 (20°C)');
+      }
+            
       renderPrinciplePage();
       renderLineSimPage();
-        
-      // 泊肃叶实验：默认应用莴麻油预设
-      if (expType === 'poiseuille') {
-        // 延迟应用预设，确保DOM已渲染
-        setTimeout(() => {
-          applyFluidPreset('莴麻油 (20°C)');
-        }, 100);
-      }
         
       // 动画结束后移除类，以便下次使用（缩短到500ms）
       setTimeout(() => {
@@ -741,9 +740,13 @@ function setupLineSimControls() {
     const slider = document.getElementById(param.id);
     const valueDisplay = document.getElementById(`${param.id}Value`);
     
+    if (!slider) return; // 跳过不存在的滑块
+    
     slider.addEventListener('input', (e) => {
       const value = parseFloat(e.target.value);
-      valueDisplay.textContent = formatScientific(value);
+      if (valueDisplay) {
+        valueDisplay.textContent = formatScientific(value);
+      }
       updateDataDisplay();
       
       // 实时重绘画布，让所有参数变化都能立即反映到动画中
@@ -820,7 +823,9 @@ function applyFluidPreset(fluidName) {
         const valueDisplay = document.getElementById('viscosityValue');
         if (slider) {
           slider.value = fluid.mu;
-          valueDisplay.textContent = formatScientific(fluid.mu);
+          if (valueDisplay) {
+            valueDisplay.textContent = formatScientific(fluid.mu);
+          }
         }
       }
       if (param.id === 'density' || param.id === 'rho' || param.id === 'fluidDensity') {
@@ -829,7 +834,9 @@ function applyFluidPreset(fluidName) {
         const valueDisplay = document.getElementById(`${sliderId}Value`);
         if (slider) {
           slider.value = fluid.rho;
-          valueDisplay.textContent = formatScientific(fluid.rho);
+          if (valueDisplay) {
+            valueDisplay.textContent = formatScientific(fluid.rho);
+          }
         }
       }
     }
@@ -1522,18 +1529,28 @@ function drawNewtonSimulation(w, h, isDark) {
   const distance = (params.distance || 10) / 1000;  // 将 mm 转换为 m
   const area = params.area || 0.1;
   
-  // 根据板间距动态调整动画中的板距离（视觉效果）
-  // distance范围：1-50mm，映射到动画中的高度：30%-90%的画布高度
+  // 根据板间距动态调整动画中的板距离（1:1严格比例映射）
+  // 定义比例因子：1mm = 多少像素
+  // 画布可用高度为ch，板间距范围1-50mm，留出上下各20%的边距
+  const marginRatio = 0.2;  // 上下各留20%边距
+  const availableHeight = ch * (1 - 2 * marginRatio);  // 可用绘制高度
   const minDistance = 1;  // mm
   const maxDistance = 50;  // mm
-  const normalizedDistance = (params.distance - minDistance) / (maxDistance - minDistance);  // 0~1
-  const minCanvasHeight = ch * 0.3;  // 最小高度：30%画布
-  const maxCanvasHeight = ch * 0.9;  // 最大高度：90%画布
-  const animatedHeight = minCanvasHeight + normalizedDistance * (maxCanvasHeight - minCanvasHeight);
+  const distanceRange = maxDistance - minDistance;  // 49mm
+  
+  // 计算比例因子：可用高度 / 板间距范围（像素/mm）
+  // 例如：如果availableHeight=400px，则pixelsPerMM = 400/49 ≈ 8.16 px/mm
+  const pixelsPerMM = availableHeight / distanceRange;
+  
+  // 根据当前板间距计算动画中的高度（1:1严格比例）
+  // 当params.distance=1mm时，animatedHeight = availableHeight * (1/49)
+  // 当params.distance=50mm时，animatedHeight = availableHeight * (49/49) = availableHeight
+  // 当params.distance=25.5mm时，animatedHeight = availableHeight * (24.5/49) = availableHeight * 0.5
+  const animatedHeight = (params.distance - minDistance) * pixelsPerMM + availableHeight * (minDistance / distanceRange);
   
   // 使用动态高度计算实际的sy和ch
   const dynamicCh = animatedHeight;
-  const dynamicSy = sy + (ch - dynamicCh) / 2;  // 居中显示
+  const dynamicSy = sy + ch * marginRatio + (availableHeight - dynamicCh) / 2;  // 从顶部边距开始，居中显示
   
   // 物理计算（使用优化后的物理引擎）
   const calc = PhysicsEngine.newtonViscosity(velocity, viscosity, params.distance || 10, area);
@@ -2347,6 +2364,24 @@ function updateDataDisplay() {
       }
     }
   }
+  
+  // 斯托克斯实验：检查雷诺数并显示警告
+  if (exp === 'stokes' && results.Re !== undefined) {
+    const warningContainer = document.getElementById('reynoldsWarning');
+    if (warningContainer) {
+      if (results.Re > 1) {
+        warningContainer.innerHTML = `
+          <div class="warning-message">
+            <span class="warning-icon">⚠️</span>
+            <span class="warning-text">雷诺数 Re = ${results.Re.toFixed(2)} > 1，不满足斯托克斯定律的层流条件（Re < 1）！</span>
+          </div>
+        `;
+        warningContainer.style.display = 'block';
+      } else {
+        warningContainer.style.display = 'none';
+      }
+    }
+  }
 }
 
 function getUnit(key) {
@@ -2668,6 +2703,7 @@ function resetSimulation() {
   AppState.stokesBallY = 0;  // 初始位置在顶部
   AppState.stokesBallV = 0;
   AppState.stokesBallStartTime = null;  // 重置小球开始时间
+  AppState.newtonGradientLineStartTime = null;  // 重置牛顿实验虚线开始时间
   AppState.dataHistory = [];
   AppState.timeHistory = [];
   // 重置粒子
@@ -2686,26 +2722,26 @@ function resetSimulation() {
   
   // 重置参数为默认值
   const experiment = EXPERIMENTS[exp];
-  experiment.params.forEach(param => {
-    const slider = document.getElementById(param.id);
-    const valueDisplay = document.getElementById(`${param.id}Value`);
-    if (slider) {
-      slider.value = param.value;
-      valueDisplay.textContent = formatScientific(param.value);
-    }
-  });
-  
-  // 泊肃叶实验：重置为蓖麻油预设
-  if (exp === 'poiseuille') {
-    setTimeout(() => {
-      applyFluidPreset('蓖麻油 (20°C)');
-    }, 100);
+  if (experiment) {
+    experiment.params.forEach(param => {
+      const slider = document.getElementById(param.id);
+      const valueDisplay = document.getElementById(`${param.id}Value`);
+      if (slider) {
+        slider.value = param.value;
+        if (valueDisplay) {
+          valueDisplay.textContent = formatScientific(param.value);
+        }
+      }
+    });
   }
   
+  // 泊肃叶实验：重置为莴麻油预设（立即应用，不延迟）
+  if (exp === 'poiseuille') {
+    applyFluidPreset('莴麻油 (20°C)');
+  }
+    
   // 更新数据
-  setTimeout(() => {
-    updateDataDisplay();
-  }, 150);
+  updateDataDisplay();
   
   // 重置图表
   if (AppState.chartInstance) {

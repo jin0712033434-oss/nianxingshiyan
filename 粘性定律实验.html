@@ -1630,6 +1630,53 @@
     }
     .ai-msg .ai-msg-action:hover { background: rgba(0,212,255,0.3); }
 
+    /* 思考动画样式 */
+    .ai-thinking {
+      align-self: flex-start;
+      padding: 10px 12px;
+      background: rgba(0,212,255,0.06);
+      border: 1px solid rgba(0,212,255,0.12);
+      color: #8899aa;
+      font-size: 0.8rem;
+      font-style: italic;
+      border-radius: 10px;
+      max-width: 92%;
+    }
+    .ai-thinking-dots {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    .ai-thinking-dots span {
+      width: 6px;
+      height: 6px;
+      background: #00d4ff;
+      border-radius: 50%;
+      animation: thinkingBounce 1.4s infinite ease-in-out;
+    }
+    .ai-thinking-dots span:nth-child(1) { animation-delay: 0s; }
+    .ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes thinkingBounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* 打字机光标 */
+    .typewriter-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #00d4ff;
+      margin-left: 2px;
+      animation: cursorBlink 0.8s infinite;
+      vertical-align: text-bottom;
+    }
+    @keyframes cursorBlink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
     #ai-input-area {
       padding: 10px 12px; border-top: 1px solid rgba(0,212,255,0.15);
       display: flex; gap: 8px; flex-shrink: 0; background: rgba(0,20,50,0.5);
@@ -8031,7 +8078,7 @@
       tags: ['对话'],
       experiment: 'all',
       title: '流体·AI 助手使用指南',
-      response: '我可以帮你：\n1. <b>🔍 原理</b> — 解释当前实验的物理原理和公式含义\n2. <b>📐 公式</b> — 展示关键公式及推导过程\n3. <b>⚙️ 指导</b> — 提供仿真操作步骤和参数建议\n4. <b>💬 对话</b> — 回答你关于实验的任何问题\n\n你可以直接输入问题，例如"终端速度怎么算"、"为什么球不动"、"对比模式怎么用"等。'
+      response: '我可以帮你：\n1. <b>🔍 原理</b> — 解释当前实验的物理原理和公式含义\n2. <b>📐 公式</b> — 展示关键公式及推导过程\n3. <b>⚙️ 指导</b> — 提供仿真操作步骤和参数建议\n4. <b>💬 对话</b> — 回答你关于实验的任何问题\n\n<b>🚀 快捷命令：</b>\n· "显示公式推导" - 查看公式逐步推导\n· "显示参数影响" - 查看参数变化趋势图\n· "对比水和蜂蜜" - 一键对比不同流体\n· "给我出道题" - 生成练习题\n· "实际案例" - 查看实际应用\n· "易错点" - 常见误区提醒\n\n你可以直接输入问题，例如"终端速度怎么算"、"为什么球不动"、"对比模式怎么用"等。'
     },
     {
       id: 'compare_mode',
@@ -8040,6 +8087,22 @@
       experiment: 'all',
       title: '对比模式使用说明',
       response: '<b>对比模式</b>可以同时运行三组独立参数（A/B/C），直观比较参数变化的影响。\n\n<b>使用方法：</b>\n1. 点击顶部工具栏的"🔀 开启对比模式"按钮\n2. 分别为 A、B、C 三组设置不同参数\n3. 点击"▶ 开始"启动三组并行仿真\n4. 观察三组之间的差异\n\n<b>斯托克斯对比模式</b>还支持切换对比维度（半径对比 / 黏度对比），并显示 v-t 曲线叠加图。\n\n<b>拖尾效果：</b>牛顿和泊肃叶对比模式下，只有调节黏度 η/μ 参数后才会显示粒子拖尾。'
+    },
+    {
+      id: 'shortcut_keys',
+      keywords: ['快捷键', '键盘', '快捷操作', '按键'],
+      tags: ['指导'],
+      experiment: 'all',
+      title: '键盘快捷键',
+      response: '<b>⌨️ 键盘快捷键：</b>\n\n· <b>空格</b> - 开始/暂停仿真\n· <b>C</b> - 切换对比模式\n· <b>T</b> - 切换浅色/深色主题\n· <b>R</b> - 重置仿真\n· <b>ESC</b> - 关闭弹窗\n\n<b>提示：</b>在输入框中按 <b>Enter</b> 键可以快速发送问题。'
+    },
+    {
+      id: 'three_laws_connection',
+      keywords: ['三个实验', '联系', '区别', '对比', '共同点', '不同点'],
+      tags: ['原理'],
+      experiment: 'all',
+      title: '三个黏性定律的联系与区别',
+      response: '<b>🔗 三个定律的内在联系：</b>\n\n<b>共同点：</b>\n· 都描述了黏性流体的运动规律\n· 都假设流体是<b>层流</b>状态（雷诺数低）\n· 都涉及黏度这个核心参数\n\n<b>📊 对比表格：</b>\n\n| 实验 | 研究对象 | 核心公式 | 关键特征 |\n|------|---------|---------|----------|\n| <b>牛顿</b> | 平行板间剪切流 | τ = μ(du/dz) | 速度梯度 |\n| <b>泊肃叶</b> | 圆管内压力流 | Q ∝ R⁴ | 半径四次方效应 |\n| <b>斯托克斯</b> | 球体在流体中沉降 | vt ∝ r² | 终端速度 |\n\n<b>💡 物理本质：</b>\n· <b>牛顿</b>：微观层面，描述流体内部的剪切应力\n· <b>泊肃叶</b>：宏观层面，描述管道中的整体流量\n· <b>斯托克斯</b>：物体层面，描述物体在流体中的运动\n\n<b>🌍 实际应用：</b>\n· 牛顿 → 润滑油设计、涂料流平\n· 泊肃叶 → 心血管、输油管道\n· 斯托克斯 → 沉淀分离、尘埃沉降'
     },
 
     // ========== 牛顿黏性定律 — 原理方面 ==========
@@ -8491,9 +8554,10 @@
                         return '<a href="#" onclick="AIAssistant.askQuestion(\'' + r + '\'); return false;" style="color: #00d4ff; text-decoration: none; display: block; margin: 4px 0; cursor: pointer;">👉 ' + r + '</a>';
                       }).join('\n');
         
+        var self = this;
         setTimeout(function() {
-          this.addAssistantMsg(recHtml, '🤖 智能推荐');
-        }.bind(this), 500);
+          self.showThinkingAndType(recHtml, '🤖 智能推荐');
+        }, 500);
       }
     },
     
@@ -8578,7 +8642,7 @@
         derivation = '请先选择一个实验，我会为你展示对应的公式推导过程。';
       }
       
-      this.addAssistantMsg(derivation, '📐 公式推导');
+      this.showThinkingAndType(derivation, '📐 公式推导');
     },
     
     // 2. 参数影响可视化
@@ -8676,7 +8740,7 @@
         visualization = '请先选择一个实验并设置参数，我会为你展示参数影响趋势图。';
       }
       
-      this.addAssistantMsg(visualization, '📊 参数影响可视化');
+      this.showThinkingAndType(visualization, '📊 参数影响可视化');
     },
     
     // 3. 对比演示
@@ -8772,7 +8836,7 @@
         comparison = '请先选择斯托克斯或泊肃叶实验，我会为你展示不同流体/管径的对比数据。';
       }
       
-      this.addAssistantMsg(comparison, '🔬 对比演示');
+      this.showThinkingAndType(comparison, '🔬 对比演示');
     },
     
     // 4. 学习引导
@@ -8862,7 +8926,7 @@
         guide = '请先选择一个实验，我会为你提供详细的学习路径指导。';
       }
       
-      this.addAssistantMsg(guide, '🎓 学习引导');
+      this.showThinkingAndType(guide, '🎓 学习引导');
     },
 
     close: function() {
@@ -8902,7 +8966,7 @@
 
       switch (mode) {
         case 'chat':
-          this.addAssistantMsg('👋 你好！直接输入你的问题，我会结合当前实验上下文为你解答。');
+          this.showThinkingAndType('👋 你好！直接输入你的问题，我会结合当前实验上下文为你解答。');
           break;
         case 'principle':
           this.queryByMode(['原理']);
@@ -8926,7 +8990,7 @@
       if (matches.length > 0) {
         this.showEntry(matches[0]);
       } else {
-        this.addAssistantMsg('当前实验暂无相关内容，请尝试在"💬 对话"模式下输入具体问题。');
+        this.showThinkingAndType('当前实验暂无相关内容，请尝试在“💬 对话”模式下输入具体问题。');
       }
     },
 
@@ -8937,7 +9001,15 @@
       if (!text) return;
       input.value = '';
       this.addUserMsg(text);
-      this.processQuery(text);
+      
+      // 显示思考状态，然后处理问题
+      var self = this;
+      // 根据问题复杂度动态调整思考时间
+      var thinkTime = 1000 + Math.random() * 1500; // 1-2.5秒
+      
+      this.showThinking(function() {
+        self.processQueryWithTypewriter(text);
+      }, thinkTime);
     },
 
     processQuery: function(text) {
@@ -8963,14 +9035,68 @@
         // 没有匹配，尝试生成上下文感知的回答
         var contextualResponse = this.generateContextualResponse(text, queryType);
         if (contextualResponse) {
-          this.addAssistantMsg(contextualResponse);
+          this.showThinkingAndType(contextualResponse);
         } else {
-          this.addAssistantMsg('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"\n\n💡 可视化命令：\n· "显示公式推导" - 查看公式逐步推导\n· "显示参数影响" - 查看参数变化趋势图\n· "对比水和蜂蜜" - 一键对比不同流体');
+          this.showThinkingAndType('抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"\n\n💡 可视化命令：\n· "显示公式推导" - 查看公式逐步推导\n· "显示参数影响" - 查看参数变化趋势图\n· "对比水和蜂蜜" - 一键对比不同流体');
         }
       }
       
       // 记录回答
       this.conversationHistory.push({ role: 'assistant', type: queryType, time: new Date() });
+    },
+    
+    // 使用打字机效果处理问题
+    processQueryWithTypewriter: function(text) {
+      // 记录对话历史
+      this.conversationHistory.push({ role: 'user', text: text, time: new Date() });
+      
+      // 智能问题分类
+      var queryType = this.classifyQuery(text);
+      this.lastQueryType = queryType;
+      
+      // 检查是否是可视化命令
+      if (this.handleVisualizationCommand(text)) {
+        return;
+      }
+      
+      // 尝试匹配知识图谱
+      var result = this.matchQuery(text);
+      
+      var self = this;
+      var container = document.getElementById('ai-messages');
+      if (!container) return;
+      
+      // 创建消息容器
+      var div = document.createElement('div');
+      div.className = 'ai-msg assistant';
+      container.appendChild(div);
+      
+      var htmlContent = '';
+      
+      if (result) {
+        // 找到匹配的知识条目
+        htmlContent = (result.title ? '<div class="ai-msg-title">' + result.title + '</div>' : '') + 
+                      this.formatResponse(result.response);
+      } else {
+        // 没有匹配，生成上下文感知的回答
+        var contextualResponse = this.generateContextualResponse(text, queryType);
+        if (contextualResponse) {
+          htmlContent = contextualResponse;
+        } else {
+          htmlContent = '抱歉，我暂时还没学会这个知识点 😊。\n\n我目前专注于流体力学基础实验，可以为你解答关于牛顿黏性定律、泊肃叶定律和斯托克斯定律的问题。\n\n你可以试试问我：\n\n👉 "什么是速度梯度？"\n\n👉 "半径四次方效应是什么意思？"\n\n👉 "密度如何影响小球沉降速度？"\n\n💡 可视化命令：\n· "显示公式推导" - 查看公式逐步推导\n· "显示参数影响" - 查看参数变化趋势图\n· "对比水和蜂蜜" - 一键对比不同流体';
+        }
+      }
+      
+      // 使用打字机效果显示
+      this.typewriterEffect(div, htmlContent, 25);
+      
+      // 记录回答
+      this.conversationHistory.push({ role: 'assistant', type: queryType, time: new Date() });
+    },
+    
+    // 格式化响应文本（处理换行等）
+    formatResponse: function(text) {
+      return text.replace(/\n/g, '<br>');
     },
     
     // 处理可视化命令
@@ -9217,7 +9343,21 @@
         resp += '\n\n' + contextEnhancement;
       }
       
-      this.addAssistantMsg(resp, entry.title);
+      // 使用打字机效果显示
+      var self = this;
+      var container = document.getElementById('ai-messages');
+      if (!container) return;
+      
+      // 创建消息容器
+      var div = document.createElement('div');
+      div.className = 'ai-msg assistant';
+      container.appendChild(div);
+      
+      var htmlContent = (entry.title ? '<div class="ai-msg-title">' + entry.title + '</div>' : '') + 
+                        this.formatResponse(resp);
+      
+      // 使用打字机效果显示
+      this.typewriterEffect(div, htmlContent, 25);
     },
     
     // 根据上下文增强回答
@@ -9355,6 +9495,103 @@
       div.innerHTML = (title ? '<div class="ai-msg-title">' + title + '</div>' : '') + text.replace(/\n/g, '<br>');
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
+    },
+    
+    // 显示思考状态，然后用打字机效果显示
+    showThinkingAndType: function(text, title) {
+      var self = this;
+      var thinkTime = 800 + Math.random() * 1200; // 0.8-2秒
+      
+      this.showThinking(function() {
+        var container = document.getElementById('ai-messages');
+        if (!container) return;
+        
+        // 创建消息容器
+        var div = document.createElement('div');
+        div.className = 'ai-msg assistant';
+        container.appendChild(div);
+        
+        var htmlContent = (title ? '<div class="ai-msg-title">' + title + '</div>' : '') + 
+                          self.formatResponse(text);
+        
+        // 使用打字机效果显示
+        self.typewriterEffect(div, htmlContent, 25);
+      }, thinkTime);
+    },
+    
+    // 逐字显示效果
+    typewriterEffect: function(element, htmlContent, speed) {
+      var self = this;
+      speed = speed || 30; // 默认每个字符30ms
+      
+      // 添加光标
+      var cursor = document.createElement('span');
+      cursor.className = 'typewriter-cursor';
+      
+      // 将HTML内容先放入一个临时div
+      var tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      
+      // 获取纯文本内容（保留HTML结构用于后续完整显示）
+      var plainText = tempDiv.textContent || tempDiv.innerText || '';
+      
+      // 创建显示容器
+      var displayDiv = document.createElement('div');
+      element.appendChild(displayDiv);
+      element.appendChild(cursor);
+      
+      var index = 0;
+      
+      function typeChar() {
+        if (index < plainText.length) {
+          // 逐字添加
+          displayDiv.textContent = plainText.substring(0, index + 1);
+          index++;
+          
+          // 自动滚动
+          var container = document.getElementById('ai-messages');
+          if (container) container.scrollTop = container.scrollHeight;
+          
+          // 随机速度，让打字更自然
+          var randomSpeed = speed + (Math.random() - 0.5) * 20;
+          setTimeout(typeChar, randomSpeed);
+        } else {
+          // 打字完成，用完整的HTML替换纯文本
+          element.removeChild(displayDiv);
+          element.removeChild(cursor);
+          element.innerHTML = htmlContent;
+          
+          // 再次自动滚动
+          var container = document.getElementById('ai-messages');
+          if (container) container.scrollTop = container.scrollHeight;
+        }
+      }
+      
+      typeChar();
+    },
+    
+    // 显示思考状态
+    showThinking: function(callback, delay) {
+      var self = this;
+      delay = delay || 1500; // 默认1.5秒思考时间
+      
+      var container = document.getElementById('ai-messages');
+      if (!container) return;
+      
+      // 创建思考状态元素
+      var thinkingDiv = document.createElement('div');
+      thinkingDiv.className = 'ai-thinking';
+      thinkingDiv.innerHTML = 'be thinking<span class="ai-thinking-dots"><span></span><span></span><span></span></span>';
+      container.appendChild(thinkingDiv);
+      container.scrollTop = container.scrollHeight;
+      
+      // 延迟后移除思考状态并执行回调
+      setTimeout(function() {
+        if (thinkingDiv.parentNode) {
+          thinkingDiv.parentNode.removeChild(thinkingDiv);
+        }
+        if (callback) callback();
+      }, delay);
     },
 
     addUserMsg: function(text) {

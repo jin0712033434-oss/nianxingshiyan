@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>黏性现象仿真模拟器</title>
+  <!-- 引入 Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- 引入 OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- 引入 Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" crossorigin src="/assets/index-FEDFmapl.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Dpq_AwdB.css">
+</head>
+<body>
+<div id="app">
+  <!-- 首页 -->
+  <div id="homePage" class="page home-page">
+    <!-- 顶部导航栏 -->
+    <nav class="home-nav-bar">
+      <h1 class="nav-title">黏性现象仿真模拟器</h1>
+      <div class="theme-switcher">
+        <span class="theme-icon sun-icon">☀</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="themeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="theme-icon moon-icon">🌙</span>
+      </div>
+    </nav>
+
+    <!-- 首页内容 -->
+    <div class="home-content">
+      <h2 class="home-title">黏性现象仿真模拟器</h2>
+      <p class="home-subtitle">通过交互式物理实验深化对黏性现象的理解</p>
+      
+      <div class="experiment-cards">
+        <div class="experiment-card" data-experiment="newton">
+          <div class="card-icon">📐</div>
+          <h3 class="card-title">牛顿粘性定律实验</h3>
+          <p class="card-desc">探索牛顿黏性定律<br>理解剪切应力与速度梯度的关系</p>
+        </div>
+        
+        <div class="experiment-card" data-experiment="poiseuille">
+          <div class="card-icon">💧</div>
+          <h3 class="card-title">泊肃叶定律实验</h3>
+          <p class="card-desc">研究管道中的层流流动<br>掌握流量与压降的关系</p>
+        </div>
+        
+        <div class="experiment-card" data-experiment="stokes">
+          <div class="card-icon">⚪</div>
+          <h3 class="card-title">斯托克斯定律实验</h3>
+          <p class="card-desc">观察球体在黏性流体中的沉降<br>学习阻力计算公式</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 实验页面 -->
+  <div id="experimentPage" class="page experiment-page" style="display: none;">
+    <div class="experiment-layout">
+      <!-- 左侧可折叠菜单 -->
+      <aside class="sidebar" id="sidebar">
+        <button class="toggle-btn" id="toggleSidebar">◀</button>
+        <div class="menu-container" id="menuContainer">
+          <button class="menu-item active" data-page="principle">📖 原理</button>
+          <button class="menu-item" data-page="lineSim">📈 线图模拟</button>
+        </div>
+      </aside>
+
+      <!-- 右侧内容区 -->
+      <main class="main-content">
+        <!-- 实验导航栏 -->
+        <nav class="experiment-nav">
+          <button class="back-btn" id="backBtn">← 返回首页</button>
+          <h2 class="experiment-title" id="experimentTitle">实验模拟</h2>
+        </nav>
+
+        <!-- 内容区 -->
+        <div class="content-area">
+          <!-- 原理页面 -->
+          <div id="principlePage" class="sub-page active"></div>
+          
+          <!-- 线图模拟页面 -->
+          <div id="lineSimPage" class="sub-page"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
