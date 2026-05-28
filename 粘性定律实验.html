@@ -1408,27 +1408,27 @@
     }
 
     .preset-btn {
-      background: rgba(0,212,255,0.1);
-      border: 1px solid rgba(0,212,255,0.2);
-      color: #dde4f0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
       padding: 8px 12px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 0.75rem;
-      transition: all 0.3s ease;
+      font-size: 12px;
+      transition: all 0.3s;
       text-align: center;
     }
 
     .preset-btn:hover {
-      background: rgba(0,212,255,0.2);
-      border-color: rgba(0,212,255,0.4);
-      transform: translateY(-1px);
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
     }
 
     .preset-btn.active {
-      background: rgba(0,212,255,0.3);
-      border-color: #00d4ff;
-      color: #00d4ff;
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
     }
 
     /* 导出按钮 */
@@ -6004,32 +6004,32 @@
     if (exp === 'newton') {
       presets = {
         water: { A: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
-                 B: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
-                 C: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01} },
-        oil: { A: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01}, 
+                 B: {viscosity:0.05, velocity:0.5, spacing:0.02, area:0.01}, 
+                 C: {viscosity:0.5, velocity:0.5, spacing:0.02, area:0.01} },
+        oil: { A: {viscosity:0.05, velocity:0.3, spacing:0.02, area:0.01}, 
                B: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01}, 
-               C: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01} },
-        honey: { A: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01}, 
-                 B: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01}, 
+               C: {viscosity:0.2, velocity:0.3, spacing:0.02, area:0.01} },
+        honey: { A: {viscosity:0.5, velocity:0.1, spacing:0.02, area:0.01}, 
+                 B: {viscosity:1.0, velocity:0.1, spacing:0.02, area:0.01}, 
                  C: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01} },
-        gradient: { A: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
-                    B: {viscosity:0.5, velocity:0.3, spacing:0.02, area:0.01}, 
-                    C: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01} }
+        gradient: { A: {viscosity:0.001, velocity:0.8, spacing:0.01, area:0.01}, 
+                    B: {viscosity:0.5, velocity:0.4, spacing:0.02, area:0.01}, 
+                    C: {viscosity:1.5, velocity:0.1, spacing:0.03, area:0.01} }
       };
     } else if (exp === 'poiseuille') {
       presets = {
         narrow: { A: {radius:0.001, length:1, dp:1000, viscosity:0.001}, 
-                  B: {radius:0.001, length:1, dp:1000, viscosity:0.001}, 
-                  C: {radius:0.001, length:1, dp:1000, viscosity:0.001} },
-        wide: { A: {radius:0.005, length:1, dp:1000, viscosity:0.001}, 
-                B: {radius:0.005, length:1, dp:1000, viscosity:0.001}, 
+                  B: {radius:0.002, length:1, dp:1000, viscosity:0.001}, 
+                  C: {radius:0.003, length:1, dp:1000, viscosity:0.001} },
+        wide: { A: {radius:0.003, length:1, dp:1000, viscosity:0.001}, 
+                B: {radius:0.004, length:1, dp:1000, viscosity:0.001}, 
                 C: {radius:0.005, length:1, dp:1000, viscosity:0.001} },
         pressure: { A: {radius:0.002, length:1, dp:500, viscosity:0.001}, 
                     B: {radius:0.002, length:1, dp:1000, viscosity:0.001}, 
                     C: {radius:0.002, length:1, dp:2000, viscosity:0.001} },
         radius4: { A: {radius:0.002, length:1, dp:1000, viscosity:0.001}, 
-                   B: {radius:0.003, length:1, dp:1000, viscosity:0.001}, 
-                   C: {radius:0.004, length:1, dp:1000, viscosity:0.001} }
+                   B: {radius:0.0025, length:1, dp:1000, viscosity:0.001}, 
+                   C: {radius:0.003, length:1, dp:1000, viscosity:0.001} }
       };
     } else if (exp === 'stokes') {
       presets = {

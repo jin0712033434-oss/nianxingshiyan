@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="df897b0e-403d-4da7-8c8b-87f139b17234" name="Changes" comment="Changes">
-      <change beforePath="$PROJECT_DIR$/粘性定律实验.html" beforeDir="false" afterPath="$PROJECT_DIR$/粘性定律实验.html" afterDir="false" />
-    </list>
+    <list default="true" id="df897b0e-403d-4da7-8c8b-87f139b17234" name="Changes" comment="Changes" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -106,7 +104,7 @@
       <workItem from="1779799074821" duration="10473000" />
       <workItem from="1779852281312" duration="4175000" />
       <workItem from="1779894158613" duration="623000" />
-      <workItem from="1779949267523" duration="4871000" />
+      <workItem from="1779949267523" duration="5212000" />
     </task>
     <servers />
   </component>
