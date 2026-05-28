@@ -9524,46 +9524,111 @@
       }, thinkTime);
     },
     
-    // 逐字显示效果
+    // 逐字显示效果（自然增长版本）
     typewriterEffect: function(element, htmlContent, speed) {
       var self = this;
       speed = speed || 30; // 默认每个字符30ms
       
+      // 解析HTML，将<br>转换为特殊标记
+      var processedHTML = htmlContent.replace(/<br\s*\/?>/gi, '<span class="br-marker"></span>');
+      
+      // 创建临时div解析HTML
+      var tempDiv = document.createElement('div');
+      tempDiv.innerHTML = processedHTML;
+      
+      // 提取所有内容片段（文本和<br>标记）
+      var fragments = [];
+      function extractFragments(node) {
+        if (node.nodeType === 3) { // 文本节点
+          var text = node.textContent;
+          if (text) {
+            fragments.push({ type: 'text', content: text });
+          }
+        } else if (node.nodeType === 1) { // 元素节点
+          var tagName = node.tagName.toLowerCase();
+          
+          // 处理<br>标记
+          if (tagName === 'span' && node.className === 'br-marker') {
+            fragments.push({ type: 'br' });
+            return;
+          }
+          
+          // 处理其他标签
+          if (tagName !== 'span' || node.className !== 'br-marker') {
+            var attrs = '';
+            for (var i = 0; i < node.attributes.length; i++) {
+              var attr = node.attributes[i];
+              if (attr.name !== 'class' || node.className !== 'br-marker') {
+                attrs += ' ' + attr.name + '="' + attr.value + '"';
+              }
+            }
+            
+            if (tagName !== 'span' || node.className !== 'br-marker') {
+              fragments.push({ type: 'tag-open', html: '<' + tagName + attrs + '>' });
+              
+              for (var i = 0; i < node.childNodes.length; i++) {
+                extractFragments(node.childNodes[i]);
+              }
+              
+              fragments.push({ type: 'tag-close', html: '</' + tagName + '>' });
+            }
+          }
+        }
+      }
+      
+      for (var i = 0; i < tempDiv.childNodes.length; i++) {
+        extractFragments(tempDiv.childNodes[i]);
+      }
+      
       // 添加光标
       var cursor = document.createElement('span');
       cursor.className = 'typewriter-cursor';
-      
-      // 将HTML内容先放入一个临时div
-      var tempDiv = document.createElement('div');
-      tempDiv.innerHTML = htmlContent;
-      
-      // 获取纯文本内容（保留HTML结构用于后续完整显示）
-      var plainText = tempDiv.textContent || tempDiv.innerText || '';
-      
-      // 创建显示容器
-      var displayDiv = document.createElement('div');
-      element.appendChild(displayDiv);
       element.appendChild(cursor);
       
-      var index = 0;
+      // 构建字符队列
+      var charQueue = [];
+      for (var i = 0; i < fragments.length; i++) {
+        var frag = fragments[i];
+        if (frag.type === 'text') {
+          for (var j = 0; j < frag.content.length; j++) {
+            charQueue.push({ type: 'char', char: frag.content[j] });
+          }
+        } else if (frag.type === 'br') {
+          charQueue.push({ type: 'br' });
+        } else {
+          charQueue.push({ type: 'html', content: frag.html });
+        }
+      }
       
-      function typeChar() {
-        if (index < plainText.length) {
-          // 逐字添加
-          displayDiv.textContent = plainText.substring(0, index + 1);
+      var index = 0;
+      var currentHTML = '';
+      
+      function typeNext() {
+        if (index < charQueue.length) {
+          var item = charQueue[index];
+          
+          if (item.type === 'char') {
+            currentHTML += item.char;
+          } else if (item.type === 'br') {
+            currentHTML += '<br>';
+          } else {
+            currentHTML += item.content;
+          }
+          
           index++;
+          
+          // 更新显示
+          element.innerHTML = currentHTML + '<span class="typewriter-cursor"></span>';
           
           // 自动滚动
           var container = document.getElementById('ai-messages');
           if (container) container.scrollTop = container.scrollHeight;
           
-          // 随机速度，让打字更自然
+          // 随机速度
           var randomSpeed = speed + (Math.random() - 0.5) * 20;
-          setTimeout(typeChar, randomSpeed);
+          setTimeout(typeNext, randomSpeed);
         } else {
-          // 打字完成，用完整的HTML替换纯文本
-          element.removeChild(displayDiv);
-          element.removeChild(cursor);
+          // 完成
           element.innerHTML = htmlContent;
           
           // 再次自动滚动
@@ -9572,7 +9637,7 @@
         }
       }
       
-      typeChar();
+      typeNext();
     },
     
     // 显示思考状态
