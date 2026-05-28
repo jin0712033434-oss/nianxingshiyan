@@ -1161,7 +1161,7 @@
       border-color: var(--accent);
     }
 
-    /* 对比模式容器 — 固定深色高科技风格（不跟随亮/暗主题） */
+    /* 对比模式容器 — 增强版深色高科技风格 */
     #compare-container {
       --cmp-bg: #060a19;
       --cmp-surface: rgba(10,15,35,0.85);
@@ -1169,128 +1169,299 @@
       --cmp-text: #dde4f0;
       --cmp-text2: #8899bb;
       --cmp-accent: #00d4ff;
-      background: #060a19;
+      background: linear-gradient(135deg, #060a19 0%, #0a1628 50%, #060a19 100%);
       color: #dde4f0;
       overflow-y: auto;
       flex: 1;
       min-height: 0;
       width: 100%;
+      padding: 16px;
     }
 
+    /* 增强卡片效果 */
     #compare-container .card {
-      background: rgba(10,15,35,0.85) !important;
-      border: 1px solid rgba(0,212,255,0.2) !important;
+      background: linear-gradient(135deg, rgba(10,15,35,0.9) 0%, rgba(15,20,40,0.85) 100%) !important;
+      border: 1px solid rgba(0,212,255,0.25) !important;
       color: #dde4f0 !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 0 20px rgba(0,212,255,0.05) !important;
+      transition: all 0.3s ease !important;
+      backdrop-filter: blur(10px);
     }
 
+    #compare-container .card:hover {
+      border-color: rgba(0,212,255,0.4) !important;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4), 0 0 30px rgba(0,212,255,0.1) !important;
+      transform: translateY(-2px);
+    }
+
+    /* A/B/C三组颜色增强 */
     #compare-container .compare-section-title {
       color: #dde4f0 !important;
+      font-size: 1rem !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 1px !important;
     }
-    #compare-container .compare-section-title.a { color: #00d4ff !important; }
-    #compare-container .compare-section-title.b { color: #ff9800 !important; }
-    #compare-container .compare-section-title.c { color: #7b61ff !important; }
+    #compare-container .compare-section-title.a { 
+      color: #00d4ff !important;
+      text-shadow: 0 0 10px rgba(0,212,255,0.5);
+    }
+    #compare-container .compare-section-title.b { 
+      color: #ff9800 !important;
+      text-shadow: 0 0 10px rgba(255,152,0,0.5);
+    }
+    #compare-container .compare-section-title.c { 
+      color: #7b61ff !important;
+      text-shadow: 0 0 10px rgba(123,97,255,0.5);
+    }
+
+    /* 参数组样式优化 */
+    #compare-container .compare-params {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    #compare-container .compare-params .param-row {
+      background: rgba(0,212,255,0.05);
+      border-radius: 8px;
+      padding: 10px;
+      border: 1px solid rgba(0,212,255,0.1);
+      transition: all 0.3s ease;
+    }
+
+    #compare-container .compare-params .param-row:hover {
+      background: rgba(0,212,255,0.08);
+      border-color: rgba(0,212,255,0.2);
+    }
 
     #compare-container .compare-params .param-row label {
       color: #8899bb !important;
+      font-weight: 600;
+      font-size: 0.75rem;
     }
+
     #compare-container .compare-params .param-row input[type="range"] {
       background: rgba(0,212,255,0.15);
+      height: 6px;
+      border-radius: 3px;
     }
+
     #compare-container .compare-params .param-row input[type="range"]::-webkit-slider-thumb {
       background: #00d4ff;
       box-shadow: 0 0 10px rgba(0,212,255,0.5);
+      width: 16px;
+      height: 16px;
     }
+
     #compare-container .compare-params .param-row input[type="number"] {
       background: rgba(255,255,255,0.06) !important;
       border: 1px solid rgba(0,212,255,0.2) !important;
       color: #dde4f0 !important;
+      border-radius: 6px;
+      padding: 4px 8px;
     }
+
     #compare-container .compare-params .param-row input[type="number"]:focus {
       border-color: #00d4ff !important;
+      box-shadow: 0 0 8px rgba(0,212,255,0.3);
     }
+
     #compare-container .compare-params .param-row .unit {
       color: #8899bb !important;
+      font-size: 0.7rem;
     }
+
+    /* 数据表格增强 */
+    #compare-container .compare-data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
     #compare-container .compare-data-table th {
       color: #00d4ff !important;
-      border-bottom-color: rgba(0,212,255,0.2) !important;
+      border-bottom: 2px solid rgba(0,212,255,0.3) !important;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.5px;
+      padding: 10px 8px;
+      background: rgba(0,212,255,0.05);
     }
+
     #compare-container .compare-data-table td {
       color: #dde4f0 !important;
-      border-bottom-color: rgba(255,255,255,0.05) !important;
+      border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+      padding: 8px;
+      font-size: 0.8rem;
     }
+
     #compare-container .compare-data-table td.metric {
       color: #8899bb !important;
+      font-weight: 600;
     }
+
     #compare-container .compare-data-table td.err {
       color: #00e676 !important;
-    }
-    #compare-container .stokes-comp-selector {
-      background: rgba(10,15,35,0.85) !important;
-      border: 1px solid rgba(0,212,255,0.2) !important;
-    }
-    #compare-container .stokes-comp-selector .selector-title { color: #00d4ff !important; }
-    #compare-container .stokes-comp-selector label { color: #dde4f0 !important; }
-    #compare-container .stokes-comp-selector .selector-hint { color: #8899bb !important; }
-    #compare-canvas { background: #060a19 !important; }
-
-    /*
-  display: none;
-  flex-direction: column;
-  gap: 14px;
-  width: 100%;
-}
-
-#compare-container.active {
-  display: flex;
-}
-
-/* 警告闪烁动画 */
-    .warn-flash {
-      animation: warnFlash 1.5s ease-out;
-      border-color: var(--error) !important;
+      font-weight: 700;
     }
 
-    @keyframes warnFlash {
-      0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.5); }
-      50% { box-shadow: 0 0 8px 2px rgba(255, 77, 77, 0.3); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+    /* 差异指示器 */
+    .diff-indicator {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 4px;
     }
 
-    /* Stokes对比类型选择器 */
-    .stokes-comp-selector {
-      margin-bottom: 10px;
+    .diff-up {
+      background: rgba(0,230,118,0.2);
+      color: #00e676;
+    }
+
+    .diff-down {
+      background: rgba(255,77,77,0.2);
+      color: #ff4d4d;
+    }
+
+    .diff-neutral {
+      background: rgba(136,153,187,0.2);
+      color: #8899bb;
+    }
+
+    /* 热力图样式 */
+    .heatmap-cell {
+      display: inline-block;
+      width: 100%;
+      height: 20px;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+
+    /* 雷达图容器 */
+    .radar-chart-container {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 12px 0;
+    }
+
+    /* 快捷操作按钮 */
+    .quick-action-btn {
+      background: linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.1) 100%);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: #00d4ff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .quick-action-btn:hover {
+      background: linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.2) 100%);
+      border-color: rgba(0,212,255,0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,212,255,0.2);
+    }
+
+    .quick-action-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 智能提示 */
+    .smart-tip {
+      background: rgba(255,152,0,0.1);
+      border: 1px solid rgba(255,152,0,0.3);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 8px 0;
+      font-size: 0.75rem;
+      color: #ffcc80;
       display: flex;
       align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      gap: 8px;
     }
 
-    .stokes-comp-selector .selector-title {
-      font-size: 0.85rem;
-      color: var(--accent);
-      font-weight: bold;
+    .smart-tip-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
     }
 
-    .stokes-comp-selector label {
-      color: var(--text-primary);
-      font-size: 0.82rem;
+    /* 参数预设 */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .preset-btn {
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.2);
+      color: #dde4f0;
+      padding: 8px 12px;
+      border-radius: 6px;
       cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.3s ease;
+      text-align: center;
     }
 
-    .stokes-comp-selector .selector-hint {
-      font-size: 0.72rem;
-      color: var(--text-secondary);
+    .preset-btn:hover {
+      background: rgba(0,212,255,0.2);
+      border-color: rgba(0,212,255,0.4);
+      transform: translateY(-1px);
     }
 
-    /* 响应式：小屏幕时对比行列堆叠 */
+    .preset-btn.active {
+      background: rgba(0,212,255,0.3);
+      border-color: #00d4ff;
+      color: #00d4ff;
+    }
+
+    /* 导出按钮 */
+    .export-btn {
+      background: linear-gradient(135deg, rgba(123,97,255,0.2) 0%, rgba(123,97,255,0.1) 100%);
+      border: 1px solid rgba(123,97,255,0.3);
+      color: #7b61ff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .export-btn:hover {
+      background: linear-gradient(135deg, rgba(123,97,255,0.3) 0%, rgba(123,97,255,0.2) 100%);
+      border-color: rgba(123,97,255,0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(123,97,255,0.2);
+    }
+
+    /* 响应式优化 */
     @media (max-width: 900px) {
       .compare-row {
         flex-direction: column;
+      }
+      
+      #compare-container {
+        padding: 12px;
       }
     }
 
@@ -5714,10 +5885,35 @@
 
     // 参数区
     var defs = paramDefs[exp] || paramDefs.newton;
+    
+    // 添加参数预设快捷按钮
+    html += '<div class="card" style="margin-bottom:12px;"><div style="font-size:0.85rem;color:#00d4ff;margin-bottom:8px;font-weight:600;">⚡ 参数预设</div>';
+    html += '<div class="preset-grid">';
+    if (exp === 'newton') {
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'water\')">💧 水 (低粘度)</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'oil\')">🛢️ 机油 (中粘度)</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'honey\')">🍯 蜂蜜 (高粘度)</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'gradient\')">📊 梯度对比</button>';
+    } else if (exp === 'poiseuille') {
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'narrow\')">🔹 细管道</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'wide\')">🔸 粗管道</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'pressure\')">💨 压力梯度</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'radius4\')">🎯 R⁴效应</button>';
+    } else if (exp === 'stokes') {
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'steel\')">⚙️ 钢球对比</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'glass\')">🔮 玻璃球对比</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'size\')">📏 尺寸效应</button>';
+      html += '<button class="preset-btn" onclick="applyCompPreset(\'viscosity\')"> 粘度效应</button>';
+    }
+    html += '</div></div>';
+    
+    // 智能提示区域
+    html += '<div id="comp-smart-tips" style="margin-bottom:12px;"></div>';
+    
     html += '<div class="compare-row">';
     ['A','B','C'].forEach(function(k) {
       var vals = compParams[k] || {}, kk = k.toLowerCase();
-      html += '<div class="compare-col"><div class="card compare-params"><div class="compare-section-title ' + colors[k] + '">模拟 ' + k + ' 参数</div>';
+      html += '<div class="compare-col"><div class="card compare-params"><div class="compare-section-title ' + colors[k] + '">🔬 模拟 ' + k + '</div>';
       defs.forEach(function(d) {
         var rawVal = vals[d.key] || 0;
         var sliderVal = rawVal;
@@ -5727,6 +5923,39 @@
       });
       html += '</div></div>';
     });
+    html += '</div>';
+
+    // 数据对比表格增强
+    var dataMetrics = dataDefs[exp] || dataDefs.newton;
+    html += '<div class="card" style="margin-top:12px;"><div style="font-size:0.9rem;color:#00d4ff;margin-bottom:10px;font-weight:700;">📊 实时数据对比</div>';
+    html += '<table class="compare-data-table"><thead><tr><th style="text-align:left;">物理量</th>';
+    ['A','B','C'].forEach(function(k) {
+      html += '<th style="color:' + (k==='A'?'#00d4ff':k==='B'?'#ff9800':'#7b61ff') + ';">' + k + ' (理论)</th>';
+      html += '<th>' + k + ' (仿真)</th>';
+      html += '<th>误差</th>';
+    });
+    html += '</tr></thead><tbody>';
+    dataMetrics.forEach(function(m) {
+      html += '<tr><td class="metric">' + m.label + '</td>';
+      ['A','B','C'].forEach(function(k) {
+        var pf = 'comp_' + k.toLowerCase() + '_';
+        html += '<td id="' + pf + m.id + '-th">-</td>';
+        html += '<td id="' + pf + m.id + '-sim">-</td>';
+        html += '<td class="err" id="' + pf + m.id + '-err">-</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    
+    // 差异分析区域
+    html += '<div class="card" style="margin-top:12px;"><div style="font-size:0.9rem;color:#00d4ff;margin-bottom:10px;font-weight:700;">🔍 差异分析</div>';
+    html += '<div id="comp-diff-analysis" style="font-size:0.8rem;color:#8899bb;">点击"开始"后显示参数差异分析</div></div>';
+    
+    // 底部工具栏：导出和快捷操作
+    html += '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center;">';
+    html += '<button class="quick-action-btn" onclick="exportCompData()">📥 导出数据</button>';
+    html += '<button class="quick-action-btn" onclick="screenshotComp()">📷 截图</button>';
+    html += '<button class="quick-action-btn" onclick="showCompHelp()">❓ 帮助</button>';
     html += '</div>';
 
     // Stokes: v-t 图在参数栏下方
@@ -5765,6 +5994,196 @@
         bindCompSN('c' + kk + '-' + p[0], 'c' + kk + '-' + p[0] + '-val', k, p[1]);
       });
     });
+  }
+
+  // 应用参数预设
+  function applyCompPreset(presetName) {
+    var exp = AppState.currentExperiment;
+    var presets = {};
+    
+    if (exp === 'newton') {
+      presets = {
+        water: { A: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
+                 B: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
+                 C: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01} },
+        oil: { A: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01}, 
+               B: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01}, 
+               C: {viscosity:0.1, velocity:0.3, spacing:0.02, area:0.01} },
+        honey: { A: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01}, 
+                 B: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01}, 
+                 C: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01} },
+        gradient: { A: {viscosity:0.001, velocity:0.5, spacing:0.02, area:0.01}, 
+                    B: {viscosity:0.5, velocity:0.3, spacing:0.02, area:0.01}, 
+                    C: {viscosity:1.5, velocity:0.1, spacing:0.02, area:0.01} }
+      };
+    } else if (exp === 'poiseuille') {
+      presets = {
+        narrow: { A: {radius:0.001, length:1, dp:1000, viscosity:0.001}, 
+                  B: {radius:0.001, length:1, dp:1000, viscosity:0.001}, 
+                  C: {radius:0.001, length:1, dp:1000, viscosity:0.001} },
+        wide: { A: {radius:0.005, length:1, dp:1000, viscosity:0.001}, 
+                B: {radius:0.005, length:1, dp:1000, viscosity:0.001}, 
+                C: {radius:0.005, length:1, dp:1000, viscosity:0.001} },
+        pressure: { A: {radius:0.002, length:1, dp:500, viscosity:0.001}, 
+                    B: {radius:0.002, length:1, dp:1000, viscosity:0.001}, 
+                    C: {radius:0.002, length:1, dp:2000, viscosity:0.001} },
+        radius4: { A: {radius:0.002, length:1, dp:1000, viscosity:0.001}, 
+                   B: {radius:0.003, length:1, dp:1000, viscosity:0.001}, 
+                   C: {radius:0.004, length:1, dp:1000, viscosity:0.001} }
+      };
+    } else if (exp === 'stokes') {
+      presets = {
+        steel: { A: {radius:0.002, viscosity:0.4, ballDensity:7800}, 
+                 B: {radius:0.003, viscosity:0.4, ballDensity:7800}, 
+                 C: {radius:0.004, viscosity:0.4, ballDensity:7800} },
+        glass: { A: {radius:0.002, viscosity:0.4, ballDensity:2500}, 
+                 B: {radius:0.003, viscosity:0.4, ballDensity:2500}, 
+                 C: {radius:0.004, viscosity:0.4, ballDensity:2500} },
+        size: { A: {radius:0.002, viscosity:0.4, ballDensity:7800}, 
+                B: {radius:0.004, viscosity:0.4, ballDensity:7800}, 
+                C: {radius:0.006, viscosity:0.4, ballDensity:7800} },
+        viscosity: { A: {radius:0.003, viscosity:0.4, ballDensity:7800}, 
+                     B: {radius:0.003, viscosity:1.0, ballDensity:7800}, 
+                     C: {radius:0.003, viscosity:1.5, ballDensity:7800} }
+      };
+    }
+    
+    var selected = presets[presetName];
+    if (selected) {
+      ['A','B','C'].forEach(function(k) {
+        var p = selected[k];
+        for (var key in p) { if (p.hasOwnProperty(key)) compParams[k][key] = p[key]; }
+      });
+      
+      // 同步DOM
+      syncCompSlidersToParams();
+      updateCompDataDisplay();
+      initCompParticles();
+      renderCompCanvas();
+      
+      // 更新智能提示
+      updateCompSmartTips(presetName);
+      
+      // 高亮当前预设按钮
+      document.querySelectorAll('.preset-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      event.target.classList.add('active');
+    }
+  }
+
+  // 同步滑块到参数
+  function syncCompSlidersToParams() {
+    var exp = AppState.currentExperiment;
+    var mapping = {
+      newton: [['visc','viscosity'],['vel','velocity'],['spac','spacing'],['area','area']],
+      poiseuille: [['radius','radius'],['length','length'],['dp','dp'],['visc','viscosity']],
+      stokes: [['radius','radius'],['visc','viscosity']]
+    };
+    var pairs = mapping[exp] || mapping.newton;
+    ['A','B','C'].forEach(function(k) {
+      var kk = k.toLowerCase();
+      pairs.forEach(function(p) {
+        var sId = 'c' + kk + '-' + p[0];
+        var valId = sId + '-val';
+        var val = compParams[k][p[1]];
+        if (p[1] === 'spacing') val = val * 1000;
+        safeSetVal(sId, val);
+        var span = document.getElementById(valId);
+        if (span) span.textContent = val;
+      });
+    });
+  }
+
+  // 更新智能提示
+  function updateCompSmartTips(presetName) {
+    var tipDiv = document.getElementById('comp-smart-tips');
+    if (!tipDiv) return;
+    
+    var tips = {
+      water: '💧 水的粘度很低，粒子流动速度快，适合观察低粘度流体特性',
+      oil: '️ 机油粘度适中，可以看到明显的速度梯度分布',
+      honey: ' 蜂蜜粘度高，粒子流动缓慢，拖尾效果明显',
+      gradient: '📊 梯度对比展示了粘度从低到高的连续变化',
+      narrow: ' 细管道：半径小，根据泊肃叶定律，流量将大幅减小',
+      wide: '🔸 粗管道：半径大，流量与半径的四次方成正比，显著增大',
+      pressure: '💨 压力梯度对比展示了ΔP对流量和速度的影响',
+      radius4: '🎯 R⁴效应：展示半径四次方定律的威力，微小变化导致巨大差异',
+      steel: '⚙️ 钢球密度大，下沉速度快，终端速度高',
+      glass: '🔮 玻璃球密度适中，下沉速度较慢，容易观察',
+      size: '📏 尺寸效应：小球受到的阻力相对更大，终端速度更低',
+      viscosity: ' 粘度效应：粘度越大，阻力越大，终端速度越低'
+    };
+    
+    if (tips[presetName]) {
+      tipDiv.innerHTML = '<div class="smart-tip"><span class="smart-tip-icon">💡</span><span>' + tips[presetName] + '</span></div>';
+    }
+  }
+
+  // 导出数据
+  function exportCompData() {
+    var exp = AppState.currentExperiment;
+    var data = {
+      experiment: exp,
+      timestamp: new Date().toISOString(),
+      groups: {}
+    };
+    
+    ['A','B','C'].forEach(function(k) {
+      data.groups[k] = {
+        params: compParams[k],
+        physics: {}
+      };
+      
+      if (exp === 'newton') {
+        data.groups[k].physics = compNewtonPhysics(compParams[k]);
+      } else if (exp === 'poiseuille') {
+        data.groups[k].physics = compPoiseuillePhysics(compParams[k]);
+      } else if (exp === 'stokes') {
+        data.groups[k].physics = compStokesPhysics(compParams[k]);
+      }
+    });
+    
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'compare_data_' + exp + '_' + Date.now() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // 截图
+  function screenshotComp() {
+    var canvas = document.getElementById('compare-canvas');
+    if (!canvas) return;
+    
+    canvas.toBlob(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'compare_screenshot_' + AppState.currentExperiment + '_' + Date.now() + '.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // 显示帮助
+  function showCompHelp() {
+    var helpHTML = '<div class="smart-tip" style="flex-direction:column;align-items:flex-start;gap:8px;">' +
+      '<div style="font-weight:700;font-size:0.85rem;">📖 对比模式使用指南</div>' +
+      '<div>• <b>参数预设</b>：快速加载预设参数组合</div>' +
+      '<div>• <b>实时数据对比</b>：查看理论值与仿真值的差异</div>' +
+      '<div>• <b>差异分析</b>：分析A/B/C三组参数的影响</div>' +
+      '<div>• <b>导出数据</b>：保存当前对比数据为JSON文件</div>' +
+      '<div>• <b>截图</b>：保存当前对比画面为PNG图片</div>' +
+      '<div>• <b>快捷键</b>：按 C 键快速切换对比模式</div>' +
+      '</div>';
+    
+    var tipDiv = document.getElementById('comp-smart-tips');
+    if (tipDiv) {
+      tipDiv.innerHTML = helpHTML;
+    }
   }
 
   function bindCompSN(sId, valId, simKey, key) {
