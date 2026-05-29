@@ -1,0 +1,28 @@
+# 依赖
+node_modules/
+# dist/  # 临时注释，用于GitHub Pages部署
+
+# 日志
+*.log
+npm-debug.log*
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.pyc
+__pycache__/
+
+# 备份文件
+*.backup
+*.clean
+
+# Python脚本（开发用）
+*.py
